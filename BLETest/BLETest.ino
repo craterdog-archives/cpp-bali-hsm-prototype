@@ -1,20 +1,36 @@
-
+// Hardware Support
 #include <Arduino.h>
 #include <SPI.h>
 #include "Adafruit_BLE.h"
 #include "Adafruit_BluefruitLE_SPI.h"
 #include "Adafruit_BluefruitLE_UART.h"
-
 #include "BluefruitConfig.h"
-
 #if SOFTWARE_SERIAL_AVAILABLE
     #include <SoftwareSerial.h>
 #endif
 
+// Cryptographic Support
+#include <AuthenticatedCipher.h>
+#include <NoiseSource.h>
+#include <SHA256.h>
+#include <RNG.h>
+#include <Cipher.h>
+#include <Crypto.h>
+#include <SHA512.h>
+#include <BlockCipher.h>
+#include <AES.h>
+#include <BigNumberUtil.h>
+#include <GCM.h>
+#include <GF128.h>
+#include <Hash.h>
+#include <P521.h>
+
+// Arduino Configuration
 #define FACTORY_RESET_ENABLE        1
 #define MINIMUM_FIRMWARE_VERSION    "0.8.0"
 #define MODE_LED_BEHAVIOUR          "DISABLE"
 #define BLE_POWER_LEVEL             -20
+
 
 // Create the bluefruit hardware SPI, using SCK/MOSI/MISO hardware SPI pins,
 // and then user selected CS/IRQ/RST
