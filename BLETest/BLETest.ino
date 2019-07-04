@@ -1,31 +1,16 @@
-// Hardware Support
 #include <Arduino.h>
 #include <SPI.h>
-#include "Adafruit_BLE.h"
-#include "Adafruit_BluefruitLE_SPI.h"
-#include "Adafruit_BluefruitLE_UART.h"
-#include "BluefruitConfig.h"
+#include <Adafruit_BLE.h>
+#include <Adafruit_BluefruitLE_SPI.h>
+#include <Adafruit_BluefruitLE_UART.h>
+#include <DigitalNotary.h>
 #if SOFTWARE_SERIAL_AVAILABLE
     #include <SoftwareSerial.h>
 #endif
 
-// Cryptographic Support
-#include <AuthenticatedCipher.h>
-#include <NoiseSource.h>
-#include <SHA256.h>
-#include <RNG.h>
-#include <Cipher.h>
-#include <Crypto.h>
-#include <SHA512.h>
-#include <BlockCipher.h>
-#include <AES.h>
-#include <BigNumberUtil.h>
-#include <GCM.h>
-#include <GF128.h>
-#include <Hash.h>
-#include <P521.h>
 
 // Arduino Configuration
+#include "BluefruitConfig.h"
 #define FACTORY_RESET_ENABLE        1
 #define MINIMUM_FIRMWARE_VERSION    "0.8.0"
 #define MODE_LED_BEHAVIOUR          "DISABLE"
@@ -137,6 +122,3 @@ void initBluetooth() {
     /* Print Bluefruit information */
     bluetooth.info();
 }
-
-
-

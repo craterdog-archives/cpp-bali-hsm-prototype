@@ -14,13 +14,15 @@
 class DigitalNotary {
 
   public:
-    static void DigitalNotary::generateKeyPair(uint8_t privateKey[66], uint8_t publicKey[132]);
-    static char* DigitalNotary::notarizeMessage(const char *message, const uint8_t privateKey[66]);
-    static bool DigitalNotary::sealIsValid(const char *message, const char* seal, const uint8_t publicKey[132]);
+    static void generateKeyPair(uint8_t privateKey[66], uint8_t publicKey[132]);
+    static char* notarizeMessage(const char* message, const uint8_t privateKey[66]);
+    static bool sealIsValid(const char* message, const char* seal, const uint8_t publicKey[132]);
 
   private:
     DigitalNotary() {}
    ~DigitalNotary() {}
+    static char* base32Encode(const uint8_t bytes[132]);
+    static void base32Decode(const char* base32, uint8_t bytes[132]);
 
 };
 

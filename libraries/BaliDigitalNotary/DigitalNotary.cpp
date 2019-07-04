@@ -7,9 +7,10 @@
  * under the terms of The MIT License (MIT), as published by the Open   *
  * Source Initiative. (See http://opensource.org/licenses/MIT)          *
  ************************************************************************/
-#include "DigitalNotary.h"
-#include <HASH512.h>
+#include <SHA512.h>
 #include <P521.h>
+#include <string.h>
+#include "DigitalNotary.h"
 
 
 /**
@@ -20,7 +21,7 @@
 void DigitalNotary::generateKeyPair(uint8_t privateKey[66], uint8_t publicKey[132]) {
     P521::generatePrivateKey(privateKey);
     P521::derivePublicKey(publicKey, privateKey);
-};
+}
 
 
 /**
@@ -32,13 +33,13 @@ void DigitalNotary::generateKeyPair(uint8_t privateKey[66], uint8_t publicKey[13
  * \param privateKey A byte buffer containing the private key.
  * \return A byte buffer containing the resulting digital signature.
  */
-char* DigitalNotary::notarizeMessage(const char *message, const uint8_t privateKey[66]) {
+char* DigitalNotary::notarizeMessage(const char* message, const uint8_t privateKey[66]) {
     SHA512 Hash;
     uint8_t signature[132];
     P521::sign(signature, privateKey, message, strlen(message), &Hash);
     char* seal = base32Encode(signature);
     return seal;
-};
+}
 
 
 /**
@@ -51,11 +52,20 @@ char* DigitalNotary::notarizeMessage(const char *message, const uint8_t privateK
  * \param signature A byte buffer containing the digital signature allegedly generated using the corresponding private key.
  * \return Whether or not the digital signature is valid.
  */
-bool DigitalNotary::sealIsValid(const char *message, const char* seal, const uint8_t publicKey[132]) {
+bool DigitalNotary::sealIsValid(const char* message, const char* seal, const uint8_t publicKey[132]) {
     SHA512 Hash;
     uint8_t signature[132];
     base32Decode(seal, signature);
     bool isValid = P521::verify(signature, publicKey, message, strlen(message), &Hash);
     return isValid;
-};
+}
+
+
+char* DigitalNotary::base32Encode(const uint8_t bytes[132]) {
+    return 0;
+}
+
+
+void DigitalNotary::base32Decode(const char* base32, uint8_t bytes[132]) {
+}
 
