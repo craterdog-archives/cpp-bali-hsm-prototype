@@ -12,15 +12,29 @@
 #include <string.h>
 #include "DigitalNotary.h"
 
+#define PRIVATE_SIZE 66
+#define PUBLIC_SIZE 132
+
+DigitalNotary::DigitalNotary() {
+}
+
+
+DigitalNotary::~DigitalNotary() {
+    for (int i = 0; i < PRIVATE_SIZE; i++) privateKey[i] = 0;
+    for (int j = 0; j < PUBLIC_SIZE; j++) publicKey[j] = 0;
+}
+
 
 /**
  * This function generates a new public-private key pair.
  * 
  * \return An object containing the new public and private keys.
  */
-void DigitalNotary::generateKeyPair(uint8_t privateKey[66], uint8_t publicKey[132]) {
+char* DigitalNotary::generateKeyPair() {
     P521::generatePrivateKey(privateKey);
     P521::derivePublicKey(publicKey, privateKey);
+    // TODO: generate and notarize the public certificate
+    return 0;
 }
 
 
@@ -30,12 +44,11 @@ void DigitalNotary::generateKeyPair(uint8_t privateKey[66], uint8_t publicKey[13
  * verified using the corresponding public key.
  * 
  * \param message The message to be digitally signed.
- * \param privateKey A byte buffer containing the private key.
  * \return A byte buffer containing the resulting digital signature.
  */
-char* DigitalNotary::notarizeMessage(const char* message, const uint8_t privateKey[66]) {
+char* DigitalNotary::notarizeMessage(const char* message) {
     SHA512 Hash;
-    uint8_t signature[132];
+    uint8_t signature[PUBLIC_SIZE];
     P521::sign(signature, privateKey, message, strlen(message), &Hash);
     char* seal = base32Encode(signature);
     return seal;
@@ -48,24 +61,23 @@ char* DigitalNotary::notarizeMessage(const char* message, const uint8_t privateK
  * private key on the specified message.
  *
  * \param message The digitally signed message.
- * \param publicKey A byte buffer containing the public key.
- * \param signature A byte buffer containing the digital signature allegedly generated using the corresponding private key.
+ * \param seal A byte buffer containing the digital signature allegedly generated using the corresponding private key.
  * \return Whether or not the digital signature is valid.
  */
-bool DigitalNotary::sealIsValid(const char* message, const char* seal, const uint8_t publicKey[132]) {
+bool DigitalNotary::sealIsValid(const char* message, const char* seal) {
     SHA512 Hash;
-    uint8_t signature[132];
+    uint8_t signature[PUBLIC_SIZE];
     base32Decode(seal, signature);
     bool isValid = P521::verify(signature, publicKey, message, strlen(message), &Hash);
     return isValid;
 }
 
 
-char* DigitalNotary::base32Encode(const uint8_t bytes[132]) {
+char* DigitalNotary::base32Encode(const uint8_t bytes[PUBLIC_SIZE]) {
     return 0;
 }
 
 
-void DigitalNotary::base32Decode(const char* base32, uint8_t bytes[132]) {
+void DigitalNotary::base32Decode(const char* base32, uint8_t bytes[PUBLIC_SIZE]) {
 }
 
