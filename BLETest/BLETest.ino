@@ -4,6 +4,7 @@
 #include <Adafruit_BluefruitLE_SPI.h>
 #include <Adafruit_BluefruitLE_UART.h>
 #include <DigitalNotary.h>
+#include <string.h>
 #if SOFTWARE_SERIAL_AVAILABLE
     #include <SoftwareSerial.h>
 #endif
@@ -44,6 +45,9 @@ void setup(void) {
  * is called automatically after setup().
  */
 void loop(void) {
+    char* message;
+    const char* seal;
+    
     // Check for incoming characters from Bluefruit
     while (bluetooth.available()) {
 
@@ -51,11 +55,20 @@ void loop(void) {
         digitalWrite(LED_BUILTIN, HIGH);  // turn the LED on (HIGH is the voltage level)
         digitalWrite(LED_BUILTIN, LOW);   // turn the LED off by making the voltage LOW
 
-        // read the next line of data
+        // read the next message
         bluetooth.readline();
+        message = bluetooth.buffer;
+        Serial.println(strlen(message));
 
-        // echo the line of data to the log
-        Serial.println(bluetooth.buffer);
+        // echo the message to the log
+        Serial.println(message);
+
+        // notarize the message
+        seal = notary->notarizeMessage(message);
+        // echo the notary seal to the log
+        Serial.println(seal);
+        delete [] seal;
+
     }
 
 }
