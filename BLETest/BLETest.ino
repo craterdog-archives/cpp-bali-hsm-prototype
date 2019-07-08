@@ -47,6 +47,7 @@ void setup(void) {
 void loop(void) {
     char* message;
     const char* seal;
+    bool isValid;
     
     // Check for incoming characters from Bluefruit
     while (bluetooth.available()) {
@@ -58,15 +59,23 @@ void loop(void) {
         // read the next message
         bluetooth.readline();
         message = bluetooth.buffer;
-        Serial.println(strlen(message));
-
-        // echo the message to the log
+        Serial.print("message: ");
         Serial.println(message);
 
         // notarize the message
         seal = notary->notarizeMessage(message);
-        // echo the notary seal to the log
+        Serial.print("seal: ");
         Serial.println(seal);
+
+        // validate the seal
+        bool isValid = notary->sealIsValid(message, seal);
+        if (isValid) {
+            Serial.println("The seal is valid.");
+        } else {
+            Serial.println("The seal is invalid.");
+        }
+
+        // clean up
         delete [] seal;
 
     }
