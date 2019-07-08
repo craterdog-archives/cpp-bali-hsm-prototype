@@ -18,7 +18,7 @@ static const char* BASE32 = "0123456789ABCDFGHJKLMNPQRSTVWXYZ";
  * byte:  00000111|11222223|33334444|45555566|66677777|...
  * mask:   F8  07  C0 3E  01 F0  0F 80  7C 03  E0  1F   F8  07
  */
-int encodeByte(const uint8_t previous, const uint8_t current, const int byteIndex, char* base32, int charIndex) {
+int encodeBytes(const uint8_t previous, const uint8_t current, const int byteIndex, char* base32, int charIndex) {
     uint8_t chunk;
     int offset = byteIndex % 5;
     switch (offset) {
@@ -96,7 +96,7 @@ const char* encode(const uint8_t* bytes, int length) {
     for (int i = 0; i < length; i++) {
         previousByte = currentByte;
         currentByte = bytes[i];
-        charIndex = encodeByte(previousByte, currentByte, i, base32, charIndex);
+        charIndex = encodeBytes(previousByte, currentByte, i, base32, charIndex);
     }
     charIndex = encodeLast(lastByte, length - 1, base32, charIndex);
     return base32;
@@ -107,7 +107,7 @@ const char* encode(const uint8_t* bytes, int length) {
  * byte:  00000111|11222223|33334444|45555566|66677777|...
  * mask:   F8  07  C0 3E  01 F0  0F 80  7C 03  E0  1F   F8  07
  */
-void decodeCharacter(const uint8_t chunk, const int charIndex, uint8_t* bytes) {
+void decodeBytes(const uint8_t chunk, const int charIndex, uint8_t* bytes) {
     int byteIndex = charIndex * 5 / 8;  // integer division drops the remainder
     int offset = charIndex % 8;
     switch (offset) {
@@ -181,7 +181,7 @@ const uint8_t* decode(const char* base32) {
         character = base32[i];
         chunk = (uint8_t) (strchr(BASE32, character) - BASE32);  // index of character in base 32
         if (i < length - 1) {
-            decodeCharacter(chunk, i, bytes);
+            decodeBytes(chunk, i, bytes);
         } else {
             decodeLast(chunk, i, bytes);
         }
