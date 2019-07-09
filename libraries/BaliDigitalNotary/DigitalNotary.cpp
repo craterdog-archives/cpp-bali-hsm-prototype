@@ -1,17 +1,16 @@
 /************************************************************************
  * Copyright (c) Crater Dog Technologies(TM).  All Rights Reserved.     *
  ************************************************************************/
-#include <SHA512.h>
-#include <P521.h>
+#include <Ed25519.h>
 #include <string.h>
 #include "DigitalNotary.h"
 
 
 // FREE FUNCTIONS
 
-static int PRIVATE_SIZE = 66;  // bytes
-static int PUBLIC_SIZE = 132;  // 66 * 2 bytes
-static const char* BASE32 = "0123456789ABCDFGHJKLMNPQRSTVWXYZ";
+const size_t SIGNATURE_SIZE = 64;  // bytes
+
+const char* BASE32 = "0123456789ABCDFGHJKLMNPQRSTVWXYZ";
 
 /*
  * offset:    0        1        2        3        4        0
@@ -85,7 +84,7 @@ int encodeLast(const uint8_t last, const int byteIndex, char* base32, int charIn
     return charIndex;
 }
 
-const char* encode(const uint8_t* bytes, int length) {
+const char* encode(const uint8_t* bytes, size_t length) {
     uint8_t previousByte = 0x00;
     uint8_t currentByte = 0x00;
     uint8_t lastByte = bytes[length - 1];
@@ -171,7 +170,7 @@ void decodeLast(const uint8_t chunk, const int charIndex, uint8_t* bytes) {
 }
 
 const uint8_t* decode(const char* base32) {
-    int length = strlen(base32);
+    size_t length = strlen(base32);
     int size = length * 5 / 8;  // integer division drops the remainder
     uint8_t* bytes = new uint8_t[size];
     memset(bytes, 0x00, size);
@@ -193,6 +192,7 @@ const uint8_t* decode(const char* base32) {
 // PUBLIC METHODS
 
 DigitalNotary::DigitalNotary() {
+    generateKeyPair();
 }
 
 DigitalNotary::~DigitalNotary() {
@@ -200,8 +200,8 @@ DigitalNotary::~DigitalNotary() {
 }
 
 char* DigitalNotary::generateKeyPair() {
-    P521::generatePrivateKey(privateKey);
-    P521::derivePublicKey(publicKey, privateKey);
+    Ed25519::generatePrivateKey(privateKey);
+    Ed25519::derivePublicKey(publicKey, privateKey);
     // TODO: generate and notarize the public certificate
     return 0;
 }
@@ -212,26 +212,21 @@ void DigitalNotary::forgetKeyPair() {
 }
 
 const char* DigitalNotary::notarizeMessage(const char* message) {
-    SHA512 Hash;
-    int length = strlen(message);
-    //uint8_t signature[PUBLIC_SIZE];
-    uint8_t signature[length];
-    //P521::sign(signature, privateKey, message, strlen(message), &Hash);
+    size_t length = strlen(message);
+    uint8_t signature[SIGNATURE_SIZE];
+    uint8_t bytes[length];
     for (int i = 0; i < length; i++) {
-        signature[i] = (uint8_t) message[i];
+        bytes[i] = (uint8_t) message[i];
     }
-    //const char* seal = encode(signature, PUBLIC_SIZE);
-    const char* seal = encode(signature, length);
+    Ed25519::sign(signature, privateKey, publicKey, message, length);
+    const char* seal = encode(signature, SIGNATURE_SIZE);
     return seal;
 }
 
 bool DigitalNotary::sealIsValid(const char* message, const char* seal) {
-    SHA512 Hash;
-    int length = strlen(message);
-    //uint8_t signature[PUBLIC_SIZE];
+    size_t length = strlen(message);
     const uint8_t* signature = decode(seal);
-    //bool isValid = P521::verify(signature, publicKey, message, strlen(message), &Hash);
-    bool isValid = (memcmp(message, signature, length) == 0);
+    bool isValid = Ed25519::verify(signature, publicKey, message, length);
     delete [] signature;
     return isValid;
 }

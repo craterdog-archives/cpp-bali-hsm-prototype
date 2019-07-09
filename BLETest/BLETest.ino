@@ -1,17 +1,10 @@
 #include <Arduino.h>
-#include <SPI.h>
 #include <Adafruit_BLE.h>
 #include <Adafruit_BluefruitLE_SPI.h>
 #include <Adafruit_BluefruitLE_UART.h>
 #include <DigitalNotary.h>
-#include <string.h>
-#if SOFTWARE_SERIAL_AVAILABLE
-    #include <SoftwareSerial.h>
-#endif
-
-
-// Arduino Configuration
 #include "BluefruitConfig.h"
+
 #define FACTORY_RESET_ENABLE        1
 #define MINIMUM_FIRMWARE_VERSION    "0.8.0"
 #define MODE_LED_BEHAVIOUR          "DISABLE"
@@ -68,7 +61,7 @@ void loop(void) {
         Serial.println(seal);
 
         // validate the seal
-        bool isValid = notary->sealIsValid(message, seal);
+        isValid = notary->sealIsValid(message, seal);
         if (isValid) {
             Serial.println("The seal is valid.");
         } else {

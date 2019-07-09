@@ -10,6 +10,9 @@
 #ifndef DIGITAL_NOTARY_H
 #define DIGITAL_NOTARY_H
 
+// sizes in bytes
+const size_t PRIVATE_SIZE = 32;
+const size_t PUBLIC_SIZE = 32;
 
 class DigitalNotary {
 
@@ -22,8 +25,8 @@ class DigitalNotary {
     bool sealIsValid(const char* message, const char* seal);
 
   private:
-    uint8_t privateKey[66];
-    uint8_t publicKey[132];
+    uint8_t publicKey[PUBLIC_SIZE];
+    uint8_t privateKey[PRIVATE_SIZE];
 
 };
 
