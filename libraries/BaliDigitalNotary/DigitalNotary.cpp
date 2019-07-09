@@ -2,7 +2,7 @@
  * Copyright (c) Crater Dog Technologies(TM).  All Rights Reserved.     *
  ************************************************************************/
 #include <string.h>
-#include "Ed25519.h"
+#include "Ed25519.h"  // change to <Ed25519.h> for real implementation
 #include "DigitalNotary.h"
 
 
