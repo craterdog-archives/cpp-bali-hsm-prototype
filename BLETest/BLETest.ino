@@ -60,7 +60,6 @@ void loop(void) {
         }
 
         // clean up
-        delete [] message;
         delete [] signature;
         delete [] encoded;
 
