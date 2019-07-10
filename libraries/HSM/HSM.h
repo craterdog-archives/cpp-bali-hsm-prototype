@@ -7,6 +7,69 @@
 #include <inttypes.h>
 #include <stddef.h>
 
+/**
+ * This class implements a hardware security module (HSM) and is designed to run on a
+ * hardened processor that is tamper resistant and shielded from EMF monitoring. The
+ * HSM provides the public-private key cryptographic functions needed to digitally
+ * sign and verify messages.
+ *
+ * The functions are split into two groups, the first which do not require access to
+ * the private key:
+ *  * digestMessage(message) => digest
+ *  * validSignature(aPublicKey, message, signature) => boolean
+ *
+ * and the second group which do involve the private key which has been encrypted
+ * using a secret key that is passed in from a mobile device:
+ *  * generateKeys(secretKey) => publicKey
+ *  * signMessage(secretKey, message => signature
+ *  * eraseKeys()
+ *
+ * The private key is encrypted using the secret key as follows:
+ *    secretKey XOR privateKey => encryptedKey
+ *
+ * The private key can then be decryped using the secret key as needed:
+ *    secretKey XOR encryptedKey => privateKey
+ *
+ * Neither the secret key nor the private key are maintained in the HSM so the private
+ * key is completely secure.
+ *
+ * The process for signing messages and verifying the resulting signatures requires
+ * several steps:
+ *  1  const char* message;  // the message to be signed
+ *  2. const uint8_t* secretKey;  // stored on a mobile device
+ *  3. const uint8_t* signature = hsm->signMessage(secretKey, message);
+ *  4. bool isValid = hsm->validSignature(aPublicKey, message, signature);
+ *
+ * If the public key corresponds to the private key that signed the message then the
+ * signature is valid.
+ *
+ * The process for generating new keys requires several steps:
+ *  1. const uint8_t* secretKey = a new random byte array containing 32 bytes
+ *  2. const uint8_t* publicKey = hsm->generateKeys(secretKey);
+ *  3. const char* certificate = construct a new certificate containing the public key
+ *  4. const uint8_t* signature = hsm->signMessage(secretKey, certificate);
+ *  5. const char* certificate = append the signature to the certificate;
+ *  6. publish the signed certificate to the cloud for others to download
+ *
+ * Note, this process can be repeated periodically to protect older keys. Anything
+ * signed with the older keys can still be validated using the corresponding public
+ * certificates available from the cloud, but the older keys will have been erased
+ * so that no one else can use them.
+ *
+ * When regenerating keys, step two above has an extra argument that is passed:
+ *  2. const uint8_t* publicKey = hsm->generateKeys(newSecretKey, existingSecretKey);
+ *
+ * This allows the HSM to decrypt and verify the existing private key before
+ * replacing it with a new private key. It also saves off the existing encrypted
+ * key so that the existing private key can be used to sign the new certificate
+ * in step four above:
+ *  4. const uint8_t* signature = hsm->signMessage(existingSecretKey, certificate);
+ *
+ * Having each new certificate signed with the previous private key allows the
+ * certificates to be managed on a key chain where each certificate is signed by the
+ * private key associated with the previous certificate. Only the first certificate
+ * is signed using its own private key.
+ */
 class HSM final {
 
   public:

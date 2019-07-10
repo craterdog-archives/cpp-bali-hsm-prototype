@@ -133,7 +133,16 @@ bool HSM::validSignature(const uint8_t aPublicKey[32], const char* message, cons
 const uint8_t* HSM::generateKeys(uint8_t newSecretKey[32], uint8_t secretKey[32]) {
     uint8_t privateKey[32];
 
-    // handle existing keys TODO: what if we are in transitioning mode?
+    // handle the transitioning state
+    if (transitioning) {
+        // roll-back the previous attempt
+        memcpy(publicKey, oldPublicKey, 32);
+        memcpy(encryptedKey, oldEncryptedKey, 32);
+        saveState(publicKey, encryptedKey);
+        transitioning = false;
+    }
+
+    // handle existing keys
     if (secretKey) {
         decryptKey(secretKey, encryptedKey, privateKey);  // erases secretKey
 
