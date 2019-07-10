@@ -90,6 +90,8 @@ bool invalidKeyPair(const uint8_t publicKey[32], const uint8_t privateKey[32]) {
 
 HSM::HSM() {
     transitioning = false;
+    erase(publicKey);
+    erase(encryptedKey);
     erase(oldPublicKey);
     erase(oldEncryptedKey);
     loadState(publicKey, encryptedKey);
@@ -97,7 +99,7 @@ HSM::HSM() {
 
 
 HSM::~HSM() {
-    saveState(publicKey, encryptedKey);
+    transitioning = false;
     erase(publicKey);
     erase(encryptedKey);
     erase(oldPublicKey);
@@ -110,7 +112,6 @@ const uint8_t* HSM::digestMessage(const char* message) {
     SHA512 digester;
     size_t messageLength = strlen(message);
     uint8_t* digest = new uint8_t[64];
-    erase(digest, 64);
     digester.update((const void*) message, messageLength);
     digester.finalize(digest, 64);
     return digest;

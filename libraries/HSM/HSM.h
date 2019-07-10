@@ -12,13 +12,13 @@ class HSM final {
   public:
     /**
      * This constructor "rehydrates" a hardware security module (HSM) on power up. It
-     * loads the keys from flash memory and begins processing requests.
+     * loads the keys from the EEPROM drive and begins processing requests.
      */
     HSM();
 
     /**
      * This destructor "dehydrates" a hardware security module (HSM) on power down. It
-     * saves the keys to flash memory and stops processing requests.
+     * erases the keys from the processor memory and stops processing requests.
      */
    ~HSM();
 
@@ -80,9 +80,9 @@ class HSM final {
     const uint8_t* signMessage(uint8_t secretKey[32], const char* message);
 
     /**
-     * This function erases from the HSM all current and past keys and resets it to
-     * an uninitialized state. This function should be called when the mobile device
-     * associated with the HSM has been lost or stolen.
+     * This function erases from the processor memory all current and past keys and
+     * erases from the EEPROM drive the current keys. This function should be called
+     * when the mobile device associated with the HSM has been lost or stolen.
      */
     void eraseKeys();
 
