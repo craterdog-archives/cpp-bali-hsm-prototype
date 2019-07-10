@@ -2,13 +2,10 @@
  * Copyright (c) Crater Dog Technologies(TM).  All Rights Reserved.     *
  ************************************************************************/
 #include <string.h>
-#include "Ed25519.h"  // change to <Ed25519.h> for real implementation
-#include "DigitalNotary.h"
+#include "Codex.h"
 
 
-// FREE FUNCTIONS
-
-const size_t SIGNATURE_SIZE = 64;  // bytes
+// PRIVATE FREE FUNCTIONS
 
 const char* BASE32 = "0123456789ABCDFGHJKLMNPQRSTVWXYZ";
 
@@ -17,9 +14,9 @@ const char* BASE32 = "0123456789ABCDFGHJKLMNPQRSTVWXYZ";
  * byte:  00000111|11222223|33334444|45555566|66677777|...
  * mask:   F8  07  C0 3E  01 F0  0F 80  7C 03  E0  1F   F8  07
  */
-int encodeBytes(const uint8_t previous, const uint8_t current, const int byteIndex, char* base32, int charIndex) {
+size_t encodeBytes(const uint8_t previous, const uint8_t current, const size_t byteIndex, char* base32, size_t charIndex) {
     uint8_t chunk;
-    int offset = byteIndex % 5;
+    size_t offset = byteIndex % 5;
     switch (offset) {
         case 0:
             chunk = (current & 0xF8) >> 3;
@@ -57,9 +54,9 @@ int encodeBytes(const uint8_t previous, const uint8_t current, const int byteInd
  * byte:  xxxxx111|00xxxxx3|00004444|0xxxxx66|000xxxxx|...
  * mask:   F8  07  C0 3E  01 F0  0F 80  7C 03  E0  1F
  */
-int encodeLast(const uint8_t last, const int byteIndex, char* base32, int charIndex) {
+size_t encodeLast(const uint8_t last, const size_t byteIndex, char* base32, size_t charIndex) {
     uint8_t chunk;
-    int offset = byteIndex % 5;
+    size_t offset = byteIndex % 5;
     switch (offset) {
         case 0:
             chunk = (last & 0x07) << 2;
@@ -84,31 +81,14 @@ int encodeLast(const uint8_t last, const int byteIndex, char* base32, int charIn
     return charIndex;
 }
 
-const char* encode(const uint8_t* bytes, size_t length) {
-    uint8_t previousByte = 0x00;
-    uint8_t currentByte = 0x00;
-    uint8_t lastByte = bytes[length - 1];
-    int size = 3 + (length * 8 / 5);  // account for a partial byte and the trailing null
-    char* base32 = new char[size];
-    memset(base32, 0x00, size);
-    int charIndex = 0;
-    for (int i = 0; i < length; i++) {
-        previousByte = currentByte;
-        currentByte = bytes[i];
-        charIndex = encodeBytes(previousByte, currentByte, i, base32, charIndex);
-    }
-    charIndex = encodeLast(lastByte, length - 1, base32, charIndex);
-    return base32;
-}
-
 /*
  * offset:    0        1        2        3        4        0
  * byte:  00000111|11222223|33334444|45555566|66677777|...
  * mask:   F8  07  C0 3E  01 F0  0F 80  7C 03  E0  1F   F8  07
  */
-void decodeBytes(const uint8_t chunk, const int charIndex, uint8_t* bytes) {
-    int byteIndex = charIndex * 5 / 8;  // integer division drops the remainder
-    int offset = charIndex % 8;
+void decodeBytes(const uint8_t chunk, const size_t charIndex, uint8_t* bytes) {
+    size_t byteIndex = charIndex * 5 / 8;  // integer division drops the remainder
+    size_t offset = charIndex % 8;
     switch (offset) {
         case 0:
             bytes[byteIndex] |= chunk << 3;
@@ -147,9 +127,9 @@ void decodeBytes(const uint8_t chunk, const int charIndex, uint8_t* bytes) {
  * byte:  xxxxx111|00xxxxx3|00004444|0xxxxx66|00077777|...
  * mask:   F8  07  C0 3E  01 F0  0F 80  7C 03  E0  1F
  */
-void decodeLast(const uint8_t chunk, const int charIndex, uint8_t* bytes) {
-    int byteIndex = charIndex * 5 / 8;  // integer division drops the remainder
-    int offset = charIndex % 8;
+void decodeLast(const uint8_t chunk, const size_t charIndex, uint8_t* bytes) {
+    size_t byteIndex = charIndex * 5 / 8;  // integer division drops the remainder
+    size_t offset = charIndex % 8;
     switch (offset) {
         case 1:
             bytes[byteIndex] |= chunk >> 2;
@@ -169,14 +149,34 @@ void decodeLast(const uint8_t chunk, const int charIndex, uint8_t* bytes) {
     }
 }
 
-const uint8_t* decode(const char* base32) {
+
+// PUBLIC MEMBER FUNCTIONS
+
+const char* Codex::encode(const uint8_t* bytes, size_t length) {
+    uint8_t previousByte = 0x00;
+    uint8_t currentByte = 0x00;
+    uint8_t lastByte = bytes[length - 1];
+    size_t size = 3 + (length * 8 / 5);  // account for a partial byte and the trailing null
+    char* base32 = new char[size];
+    memset(base32, 0x00, size);
+    size_t charIndex = 0;
+    for (size_t i = 0; i < length; i++) {
+        previousByte = currentByte;
+        currentByte = bytes[i];
+        charIndex = encodeBytes(previousByte, currentByte, i, base32, charIndex);
+    }
+    charIndex = encodeLast(lastByte, length - 1, base32, charIndex);
+    return base32;
+}
+
+const uint8_t* Codex::decode(const char* base32) {
     size_t length = strlen(base32);
-    int size = length * 5 / 8;  // integer division drops the remainder
+    size_t size = length * 5 / 8;  // integer division drops the remainder
     uint8_t* bytes = new uint8_t[size];
     memset(bytes, 0x00, size);
     char character;
     uint8_t chunk;
-    for (int i = 0; i < length; i++) {
+    for (size_t i = 0; i < length; i++) {
         character = base32[i];
         chunk = (uint8_t) (strchr(BASE32, character) - BASE32);  // index of character in base 32
         if (i < length - 1) {
@@ -189,45 +189,9 @@ const uint8_t* decode(const char* base32) {
 }
 
 
-// PUBLIC METHODS
+// PRIVATE MEMBER FUNCTIONS
 
-DigitalNotary::DigitalNotary() {
-    generateKeyPair();
-}
+Codex::Codex() {}
 
-DigitalNotary::~DigitalNotary() {
-    forgetKeyPair();
-}
-
-char* DigitalNotary::generateKeyPair() {
-    Ed25519::generatePrivateKey(privateKey);
-    Ed25519::derivePublicKey(publicKey, privateKey);
-    // TODO: generate and notarize the public certificate
-    return 0;
-}
-
-void DigitalNotary::forgetKeyPair() {
-    for (int i = 0; i < PRIVATE_SIZE; i++) privateKey[i] = 0;
-    for (int j = 0; j < PUBLIC_SIZE; j++) publicKey[j] = 0;
-}
-
-const char* DigitalNotary::notarizeMessage(const char* message) {
-    size_t length = strlen(message);
-    uint8_t signature[SIGNATURE_SIZE];
-    uint8_t bytes[length];
-    for (int i = 0; i < length; i++) {
-        bytes[i] = (uint8_t) message[i];
-    }
-    Ed25519::sign(signature, privateKey, publicKey, message, length);
-    const char* seal = encode(signature, SIGNATURE_SIZE);
-    return seal;
-}
-
-bool DigitalNotary::sealIsValid(const char* message, const char* seal) {
-    size_t length = strlen(message);
-    const uint8_t* signature = decode(seal);
-    bool isValid = Ed25519::verify(signature, publicKey, message, length);
-    delete [] signature;
-    return isValid;
-}
+Codex::~Codex() {}
 

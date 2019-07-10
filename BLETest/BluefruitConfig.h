@@ -55,3 +55,9 @@
 #define BLUEFRUIT_SPI_MISO             12
 #define BLUEFRUIT_SPI_MOSI             11
 
+
+// FEATHER SETTINGS
+#define FACTORY_RESET_ENABLE        1
+#define MINIMUM_FIRMWARE_VERSION    "0.8.0"
+#define MODE_LED_BEHAVIOUR          "DISABLE"
+#define BLE_POWER_LEVEL             -10

@@ -2,34 +2,27 @@
 #include <Adafruit_BLE.h>
 #include <Adafruit_BluefruitLE_SPI.h>
 #include <Adafruit_BluefruitLE_UART.h>
-#include <DigitalNotary.h>
+#include <Codex.h>
+#include <HSM.h>
 #include "BluefruitConfig.h"
-
-#define FACTORY_RESET_ENABLE        1
-#define MINIMUM_FIRMWARE_VERSION    "0.8.0"
-#define MODE_LED_BEHAVIOUR          "DISABLE"
-#define BLE_POWER_LEVEL             -10
-
 
 // Create the bluefruit hardware SPI, using SCK/MOSI/MISO hardware SPI pins,
 // and then user selected CS/IRQ/RST
 Adafruit_BluefruitLE_SPI bluetooth(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 
-DigitalNotary* notary;
+HSM* hsm;
+const uint8_t* publicKey;
+uint8_t* secretKey;
 
 /*
  * This function configures the HW an the BLE module. It is called
  * automatically on startup.
  */
 void setup(void) {
-
     initConsole();
-
-    initNotary();
-    
+    initHSM();
     initBluetooth();
-
 }
 
 
@@ -38,9 +31,6 @@ void setup(void) {
  * is called automatically after setup().
  */
 void loop(void) {
-    char* message;
-    const char* seal;
-    bool isValid;
     
     // Check for incoming characters from Bluefruit
     while (bluetooth.available()) {
@@ -51,25 +41,28 @@ void loop(void) {
 
         // read the next message
         bluetooth.readline();
-        message = bluetooth.buffer;
+        const char* message = bluetooth.buffer;
         Serial.print("message: ");
         Serial.println(message);
 
         // notarize the message
-        seal = notary->notarizeMessage(message);
-        Serial.print("seal: ");
-        Serial.println(seal);
+        const uint8_t* signature = hsm->signMessage(secretKey, message);
+        const char* encoded = Codex::encode(signature, 64);
+        Serial.print("signature: ");
+        Serial.println(encoded);
 
-        // validate the seal
-        isValid = notary->sealIsValid(message, seal);
+        // validate the signature
+        bool isValid = hsm->validSignature(publicKey, message, signature);
         if (isValid) {
-            Serial.println("The seal is valid.");
+            Serial.println("The signature is valid.");
         } else {
-            Serial.println("The seal is invalid.");
+            Serial.println("The signature is invalid.");
         }
 
         // clean up
-        delete [] seal;
+        delete [] message;
+        delete [] signature;
+        delete [] encoded;
 
     }
 
@@ -92,9 +85,16 @@ void initConsole() {
 }
 
 
-void initNotary() {
+void initHSM() {
+    Serial.println("Loading the state of the HSM...");
+    hsm = new HSM();
+    Serial.println("Done.");
+    Serial.println("");
+
     Serial.println("Generating a new key pair...");
-    notary = new DigitalNotary();
+    secretKey = new uint8_t[32];
+    memset(secretKey, 0x9D, 32);
+    publicKey = hsm->generateKeys(secretKey);
     Serial.println("Done.");
     Serial.println("");
 }
