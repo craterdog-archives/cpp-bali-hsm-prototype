@@ -149,7 +149,7 @@ class HSM final {
      */
     void eraseKeys();
 
-  private:
+//private:
     bool transitioning = false;
     uint8_t publicKey[32];
     uint8_t encryptedKey[32];

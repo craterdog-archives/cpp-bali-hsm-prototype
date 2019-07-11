@@ -14,13 +14,13 @@ class Codex final {
      * It returns a string containing the corresponding base 32 encoding of
      * the byte array.
      */
-    static const char* encode(const uint8_t* bytes, size_t length);
+    static char* encode(const uint8_t* bytes, size_t length);
 
     /**
      * This function is passed a string containing the base 32 encoding of a
      * byte array. It returns the corresponding decoded byte array.
      */
-    static const uint8_t* decode(const char* base32);
+    static uint8_t* decode(const char* base32);
 
   private:
     // These are private since this is a utility class with only static functions.

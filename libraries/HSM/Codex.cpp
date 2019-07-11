@@ -152,7 +152,7 @@ void decodeLast(const uint8_t chunk, const size_t charIndex, uint8_t* bytes) {
 
 // PUBLIC MEMBER FUNCTIONS
 
-const char* Codex::encode(const uint8_t* bytes, size_t length) {
+char* Codex::encode(const uint8_t* bytes, size_t length) {
     uint8_t previousByte = 0x00;
     uint8_t currentByte = 0x00;
     uint8_t lastByte = bytes[length - 1];
@@ -169,7 +169,7 @@ const char* Codex::encode(const uint8_t* bytes, size_t length) {
     return base32;
 }
 
-const uint8_t* Codex::decode(const char* base32) {
+uint8_t* Codex::decode(const char* base32) {
     size_t length = strlen(base32);
     size_t size = length * 5 / 8;  // integer division drops the remainder
     uint8_t* bytes = new uint8_t[size];
