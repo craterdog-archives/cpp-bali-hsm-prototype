@@ -33,7 +33,7 @@ void setup(void) {
 void loop(void) {
     
     // Check for incoming characters from Bluefruit
-    while (bluetooth.available()) {
+    if (bluetooth.available()) {
 
         // signal an incoming request
         digitalWrite(LED_BUILTIN, HIGH);  // turn the LED on (HIGH is the voltage level)
