@@ -2,9 +2,9 @@
 #include <Adafruit_BLE.h>
 #include <Adafruit_BluefruitLE_SPI.h>
 #include <Adafruit_BluefruitLE_UART.h>
+#include "Config.h"
 #include <Codex.h>
 #include <HSM.h>
-#include "BluefruitConfig.h"
 
 // Create the bluefruit hardware SPI, using SCK/MOSI/MISO hardware SPI pins,
 // and then user selected CS/IRQ/RST
@@ -108,7 +108,7 @@ void initBluetooth() {
     Serial.println("OK!");
 
     if ( FACTORY_RESET_ENABLE ) {
-        /* Perform a factory reset to make sure everything is in a known state */
+        // Perform a factory reset to make sure everything is in a known state
         Serial.println("Performing a factory reset...");
         if ( ! bluetooth.factoryReset() ) {
             Serial.println("No factory reset occurred.");
@@ -118,19 +118,20 @@ void initBluetooth() {
         }
     }
 
-    /* Disable command echo from Bluefruit */
+    // Disable command echo from Bluefruit
     Serial.println("Disabling the command echo...");
     bluetooth.echo(false);
     Serial.println("Done.");
     Serial.println("");
     
-    /* Limit the range for connections for better security */
+    // Limit the range for connections for better security
+    // Allowed values: -40, -20, -16, -12, -8, -4, 0, and 4
     Serial.println("Limit the range for bluetooth...");
-    bluetooth.sendCommandCheckOK("AT+BLEPOWERLEVEL=" BLE_POWER_LEVEL);
+    bluetooth.sendCommandCheckOK("AT+BLEPOWERLEVEL=-40");
     Serial.println("Done.");
     Serial.println("");
     
-    /* Print Bluefruit information */
+    // Print Bluefruit information
     Serial.println("Requesting Bluefruit info...");
     bluetooth.info();
     Serial.println("Done.");
@@ -140,7 +141,7 @@ void initBluetooth() {
     Serial.println("Then Enter characters to send to Bluefruit");
     Serial.println();
 
-    // debug info is a little annoying after this point!
+    // Debug info is a little annoying after this point!
     Serial.println("Turning off verbose output...");
     bluetooth.verbose(false);
     Serial.println("Done.");
