@@ -13,52 +13,12 @@ Adafruit_BluefruitLE_SPI bluetooth(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUI
 
 HSM* hsm;
 
-// The following code is just here for testing and should be removed once a real mobile
-// client has been developed.
+// These are just here for testing
+uint8_t* randomBytes(size_t length);
 const char* lastMessage = strdup("");
-
-const char* getMessage(const char* message) {
-    if (strcmp(message, "") == 0) {
-        return lastMessage;
-    } else {
-        delete [] lastMessage;
-        lastMessage = strdup(message);
-    }
-}
-
 uint8_t* lastSecretKey = randomBytes(32);
-
-uint8_t* getSecretKey(const char* encodedSecretKey) {
-    if (strcmp(encodedSecretKey, "") == 0) {
-        return lastSecretKey;
-    } else {
-        delete [] lastSecretKey;
-        lastSecretKey = Codex::decode(encodedSecretKey);
-    }
-}
-
 const uint8_t* lastPublicKey;
-
-const uint8_t* getPublicKey(const char* encodedPublicKey) {
-    if (strcmp(encodedPublicKey, "") == 0) {
-        return lastPublicKey;
-    } else {
-        delete [] lastPublicKey;
-        lastPublicKey = Codex::decode(encodedPublicKey);
-    }
-}
-
 const uint8_t* lastSignature;
-
-const uint8_t* getSignature(const char* encodedSignature) {
-    if (strcmp(encodedSignature, "") == 0) {
-        return lastSignature;
-    } else {
-        delete [] lastSignature;
-        lastSignature = Codex::decode(encodedSignature);
-    }
-}
-// End of test code.
 
 
 /*
@@ -99,7 +59,7 @@ void loop(void) {
                 while (!bluetooth.available()) delay(500);
                 bluetooth.readline();
                 const char* message = bluetooth.buffer;
-                message = getMessage(message);
+                message = getMessage(message);  // just for testing
                 Serial.print("message: ");
                 Serial.println(message);
 
@@ -130,7 +90,7 @@ void loop(void) {
                 while (!bluetooth.available()) delay(500);
                 bluetooth.readline();
                 const char* message = bluetooth.buffer;
-                message = getMessage(message);
+                message = getMessage(message);  // just for testing
                 Serial.print("message: ");
                 Serial.println(message);
 
@@ -200,7 +160,7 @@ void loop(void) {
                 while (!bluetooth.available()) delay(500);
                 bluetooth.readline();
                 const char* message = bluetooth.buffer;
-                message = getMessage(message);
+                message = getMessage(message);  // just for testing
                 Serial.print("message: ");
                 Serial.println(message);
 
@@ -249,14 +209,6 @@ void initConsole() {
 void initHSM() {
     Serial.println("Loading the state of the HSM...");
     hsm = new HSM();
-    Serial.print("Public Key: ");
-    Serial.println(Codex::encode(hsm->publicKey, 32));
-    Serial.print("Encrypted Key: ");
-    Serial.println(Codex::encode(hsm->encryptedKey, 32));
-    Serial.print("Old Public Key: ");
-    Serial.println(Codex::encode(hsm->oldPublicKey, 32));
-    Serial.print("Old Encrypted Key: ");
-    Serial.println(Codex::encode(hsm->oldEncryptedKey, 32));
     Serial.println("Done.");
     Serial.println("");
 }
@@ -313,3 +265,49 @@ void initBluetooth() {
     Serial.println("Connected.");
     Serial.println("");
 }
+
+
+// The following code is just here for testing and should be removed once a real mobile
+// client has been developed.
+
+const char* getMessage(const char* message) {
+    if (strcmp(message, "") == 0) {
+        return lastMessage;
+    } else {
+        delete [] lastMessage;
+        lastMessage = strdup(message);
+    }
+}
+
+
+uint8_t* getSecretKey(const char* encodedSecretKey) {
+    if (strcmp(encodedSecretKey, "") == 0) {
+        return lastSecretKey;
+    } else {
+        delete [] lastSecretKey;
+        lastSecretKey = Codex::decode(encodedSecretKey);
+    }
+}
+
+
+const uint8_t* getPublicKey(const char* encodedPublicKey) {
+    if (strcmp(encodedPublicKey, "") == 0) {
+        return lastPublicKey;
+    } else {
+        delete [] lastPublicKey;
+        lastPublicKey = Codex::decode(encodedPublicKey);
+    }
+}
+
+
+const uint8_t* getSignature(const char* encodedSignature) {
+    if (strcmp(encodedSignature, "") == 0) {
+        return lastSignature;
+    } else {
+        delete [] lastSignature;
+        lastSignature = Codex::decode(encodedSignature);
+    }
+}
+
+// End of test code.
+
