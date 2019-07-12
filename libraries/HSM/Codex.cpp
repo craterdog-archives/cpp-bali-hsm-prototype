@@ -1,13 +1,60 @@
 /************************************************************************
  * Copyright (c) Crater Dog Technologies(TM).  All Rights Reserved.     *
  ************************************************************************/
-#include <string.h>
 #include "Codex.h"
+#include <string.h>
 
 
-// PRIVATE FREE FUNCTIONS
+// FORWARD REFERENCES
 
 const char* BASE32 = "0123456789ABCDFGHJKLMNPQRSTVWXYZ";
+
+size_t encodeBytes(const uint8_t previous, const uint8_t current, const size_t byteIndex, char* base32, size_t charIndex);
+size_t encodeLast(const uint8_t last, const size_t byteIndex, char* base32, size_t charIndex);
+void decodeBytes(const uint8_t chunk, const size_t charIndex, uint8_t* bytes);
+void decodeLast(const uint8_t chunk, const size_t charIndex, uint8_t* bytes);
+
+
+// PUBLIC METHODS
+
+char* Codex::encode(const uint8_t* bytes, size_t length) {
+    uint8_t previousByte = 0x00;
+    uint8_t currentByte = 0x00;
+    uint8_t lastByte = bytes[length - 1];
+    size_t size = 3 + (length * 8 / 5);  // account for a partial byte and the trailing null
+    char* base32 = new char[size];
+    memset(base32, 0x00, size);
+    size_t charIndex = 0;
+    for (size_t i = 0; i < length; i++) {
+        previousByte = currentByte;
+        currentByte = bytes[i];
+        charIndex = encodeBytes(previousByte, currentByte, i, base32, charIndex);
+    }
+    charIndex = encodeLast(lastByte, length - 1, base32, charIndex);
+    return base32;
+}
+
+uint8_t* Codex::decode(const char* base32) {
+    size_t length = strlen(base32);
+    size_t size = length * 5 / 8;  // integer division drops the remainder
+    uint8_t* bytes = new uint8_t[size];
+    memset(bytes, 0x00, size);
+    char character;
+    uint8_t chunk;
+    for (size_t i = 0; i < length; i++) {
+        character = base32[i];
+        chunk = (uint8_t) (strchr(BASE32, character) - BASE32);  // index of character in base 32
+        if (i < length - 1) {
+            decodeBytes(chunk, i, bytes);
+        } else {
+            decodeLast(chunk, i, bytes);
+        }
+    }
+    return bytes;
+}
+
+
+// PRIVATE FUNCTIONS
 
 /*
  * offset:    0        1        2        3        4        0
@@ -148,50 +195,4 @@ void decodeLast(const uint8_t chunk, const size_t charIndex, uint8_t* bytes) {
             break;
     }
 }
-
-
-// PUBLIC MEMBER FUNCTIONS
-
-char* Codex::encode(const uint8_t* bytes, size_t length) {
-    uint8_t previousByte = 0x00;
-    uint8_t currentByte = 0x00;
-    uint8_t lastByte = bytes[length - 1];
-    size_t size = 3 + (length * 8 / 5);  // account for a partial byte and the trailing null
-    char* base32 = new char[size];
-    memset(base32, 0x00, size);
-    size_t charIndex = 0;
-    for (size_t i = 0; i < length; i++) {
-        previousByte = currentByte;
-        currentByte = bytes[i];
-        charIndex = encodeBytes(previousByte, currentByte, i, base32, charIndex);
-    }
-    charIndex = encodeLast(lastByte, length - 1, base32, charIndex);
-    return base32;
-}
-
-uint8_t* Codex::decode(const char* base32) {
-    size_t length = strlen(base32);
-    size_t size = length * 5 / 8;  // integer division drops the remainder
-    uint8_t* bytes = new uint8_t[size];
-    memset(bytes, 0x00, size);
-    char character;
-    uint8_t chunk;
-    for (size_t i = 0; i < length; i++) {
-        character = base32[i];
-        chunk = (uint8_t) (strchr(BASE32, character) - BASE32);  // index of character in base 32
-        if (i < length - 1) {
-            decodeBytes(chunk, i, bytes);
-        } else {
-            decodeLast(chunk, i, bytes);
-        }
-    }
-    return bytes;
-}
-
-
-// PRIVATE MEMBER FUNCTIONS
-
-Codex::Codex() {}
-
-Codex::~Codex() {}
 

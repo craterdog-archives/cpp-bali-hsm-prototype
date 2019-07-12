@@ -4,6 +4,7 @@
 #include <Adafruit_BluefruitLE_UART.h>
 #include "Config.h"
 #include <Codex.h>
+#include <Formatter.h>
 #include <HSM.h>
 
 // Create the bluefruit hardware SPI, using SCK/MOSI/MISO hardware SPI pins,
@@ -310,4 +311,3 @@ const uint8_t* getSignature(const char* encodedSignature) {
 }
 
 // End of test code.
-
