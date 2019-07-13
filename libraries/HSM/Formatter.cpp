@@ -250,14 +250,8 @@ const char* Formatter::indentComponent(const char *component) {
     // allocate space for the result include the terminating null
     char *indented = new char[length + 4 * count + 1];
 
-    // indent the first line
-    size_t index = 0;
-    indented[index++] = ' ';
-    indented[index++] = ' ';
-    indented[index++] = ' ';
-    indented[index++] = ' ';
-
     // indent each new line
+    size_t index = 0;
     for (size_t j = 0; j < length; j++) {
         indented[index++] = component[j];
         if (component[j] == '\n') {

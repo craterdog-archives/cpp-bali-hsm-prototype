@@ -89,21 +89,19 @@ bool invalidKeyPair(const uint8_t publicKey[32], const uint8_t privateKey[32]) {
 // PUBLIC METHODS
 
 HSM::HSM() {
-    transitioning = false;
-    erase(publicKey);
-    erase(encryptedKey);
-    erase(oldPublicKey);
-    erase(oldEncryptedKey);
     loadState(publicKey, encryptedKey);
 }
 
 
 HSM::~HSM() {
-    transitioning = false;
     erase(publicKey);
     erase(encryptedKey);
-    erase(oldPublicKey);
-    erase(oldEncryptedKey);
+    if (previousPublicKey) {
+        erase(previousPublicKey);
+        delete [] previousPublicKey;
+        erase(previousEncryptedKey);
+        delete [] previousEncryptedKey;
+    }
 }
 
 
@@ -133,13 +131,16 @@ bool HSM::validSignature(const uint8_t aPublicKey[32], const char* message, cons
 const uint8_t* HSM::generateKeys(uint8_t newSecretKey[32], uint8_t secretKey[32]) {
     uint8_t privateKey[32];
 
-    // handle the transitioning state
-    if (transitioning) {
-        // roll-back the previous attempt
-        memcpy(publicKey, oldPublicKey, 32);
-        memcpy(encryptedKey, oldEncryptedKey, 32);
+    // handle any previous keys
+    if (previousPublicKey) {
+        // roll-back the previous regeneration attempt
+        memcpy(publicKey, previousPublicKey, 32);
+        memcpy(encryptedKey, previousEncryptedKey, 32);
         saveState(publicKey, encryptedKey);
-        transitioning = false;
+        erase(previousPublicKey);
+        delete [] previousPublicKey;
+        erase(previousEncryptedKey);
+        delete [] previousEncryptedKey;
     }
 
     // handle existing keys
@@ -154,10 +155,11 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[32], uint8_t secretKey[32]
             return 0;  // TODO: analyze as possible side channel
         }
 
-        // save copies of the old public and encrypted keys
-        transitioning = true;
-        memcpy(oldPublicKey, publicKey, 32);
-        memcpy(oldEncryptedKey, encryptedKey, 32);
+        // save copies of the previous public and encrypted keys
+        previousPublicKey = new uint8_t[32];
+        memcpy(previousPublicKey, publicKey, 32);
+        previousEncryptedKey = new uint8_t[32];
+        memcpy(previousEncryptedKey, encryptedKey, 32);
     }
 
     // generate a new key pair
@@ -180,9 +182,9 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[32], uint8_t secretKey[32]
 const uint8_t* HSM::signMessage(uint8_t secretKey[32], const char* message) {
     uint8_t privateKey[32];
 
-    // handle the transitioning state
-    const uint8_t* currentPublicKey = transitioning ? oldPublicKey : publicKey;
-    const uint8_t* currentEncryptedKey = transitioning ? oldEncryptedKey : encryptedKey;
+    // handle any previous key state
+    const uint8_t* currentPublicKey = previousPublicKey ? previousPublicKey : publicKey;
+    const uint8_t* currentEncryptedKey = previousEncryptedKey ? previousEncryptedKey : encryptedKey;
 
     // decrypt the private key
     decryptKey(secretKey, currentEncryptedKey, privateKey);  // erases secretKey
@@ -199,11 +201,12 @@ const uint8_t* HSM::signMessage(uint8_t secretKey[32], const char* message) {
     size_t messageLength = strlen(message);
     Ed25519::sign(signature, privateKey, currentPublicKey, (const void*) message, messageLength);
 
-    // handle the transitioning state
-    if (transitioning) {
-        erase(oldPublicKey);
-        erase(oldEncryptedKey);
-        transitioning = false;
+    // handle any previous key state
+    if (previousPublicKey) {
+        erase(previousPublicKey);
+        delete [] previousPublicKey;
+        erase(previousEncryptedKey);
+        delete [] previousEncryptedKey;
     }
 
     // return the message signature
@@ -217,8 +220,10 @@ void HSM::eraseKeys() {
     // erase all keys in memory
     erase(publicKey);
     erase(encryptedKey);
-    erase(oldPublicKey);
-    erase(oldEncryptedKey);
+    erase(previousPublicKey);
+    delete [] previousPublicKey;
+    erase(previousEncryptedKey);
+    delete [] previousEncryptedKey;
 
     // erase the state of the EEPROM drive
     saveState(publicKey, encryptedKey);

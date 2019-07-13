@@ -116,8 +116,8 @@ class HSM final {
      * If an optional existing secret key is passed as well, it is used to reconstruct
      * the existing private key using the existing encrypted key and verifying it with
      * the existing public key. If the keys are valid, the existing encrypted key and
-     * existing public key are saved as oldX and oldP,and the new versions of the keys
-     * are generated as described above.
+     * existing public key are saved off,and the new versions of the keys are generated
+     * as described above.
      *
      * It is the responsibilty of the calling program to 'delete []' the public key
      * once it has finished with it.
@@ -132,7 +132,7 @@ class HSM final {
      * the private key are erased from the HSM. The digital signature for the message
      * is returned from the function.
      *
-     * If there is an old encrypted key, that key is used one last time and then erased
+     * If there is a previous encrypted key, that key is used one last time and then erased
      * from the HSM. This is a special case that occurs only when the public certificate
      * for a new key is being signed by the previous private key to prove it belongs
      * on the same key chain.
@@ -150,11 +150,10 @@ class HSM final {
     void eraseKeys();
 
   private:
-    bool transitioning = false;
     uint8_t publicKey[32];
     uint8_t encryptedKey[32];
-    uint8_t oldPublicKey[32];
-    uint8_t oldEncryptedKey[32];
+    uint8_t* previousPublicKey;
+    uint8_t* previousEncryptedKey;
 
 };
 
