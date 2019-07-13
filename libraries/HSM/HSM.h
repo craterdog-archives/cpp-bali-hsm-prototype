@@ -7,6 +7,11 @@
 #include <inttypes.h>
 #include <stddef.h>
 
+#define AID_SIZE 32  // account Id size in bytes
+#define KEY_SIZE 32  // key size in bytes
+#define DIG_SIZE 64  // message digest size in bytes
+#define SIG_SIZE 64  // digital signature size in bytes
+
 /**
  * This class implements a hardware security module (HSM) and is designed to run on a
  * hardened processor that is tamper resistant and shielded from EMF monitoring. The
@@ -44,7 +49,7 @@
  * signature is valid.
  *
  * The process for generating new keys requires several steps:
- *  1. const uint8_t* secretKey = a new random byte array containing 32 bytes
+ *  1. const uint8_t* secretKey = a new random byte array containing KEY_SIZE bytes
  *  2. const uint8_t* publicKey = hsm->generateKeys(secretKey);
  *  3. const char* certificate = construct a new certificate containing the public key
  *  4. const uint8_t* signature = hsm->signMessage(secretKey, certificate);
@@ -90,7 +95,7 @@ class HSM final {
     * hardware security module (HSM). Once registered to that accountId, this function
     * cannot be called again successfully.
     */
-   bool registerAccount(const uint8_t accountId[20]);
+   bool registerAccount(const uint8_t accountId[AID_SIZE]);
 
     /**
      * This function is passed, from a mobile device, a message. It generates, for the
@@ -99,7 +104,7 @@ class HSM final {
      * returned from the function. It is the responsibilty of the calling program to
      * 'delete []' the digest once it has finished with it.
      */
-    const uint8_t* digestMessage(const uint8_t accountId[20], const char* message);
+    const uint8_t* digestMessage(const uint8_t accountId[AID_SIZE], const char* message);
 
     /**
      * This function is passed, from a mobile device, a message, and a digital signature
@@ -114,10 +119,10 @@ class HSM final {
      * private key in the hardware security module (HSM) is used.
      */
     bool validSignature(
-        const uint8_t accountId[20],
+        const uint8_t accountId[AID_SIZE],
         const char* message,
-        const uint8_t signature[64],
-        const uint8_t aPublicKey[32] = 0
+        const uint8_t signature[SIG_SIZE],
+        const uint8_t aPublicKey[KEY_SIZE] = 0
     );
 
     /**
@@ -138,9 +143,9 @@ class HSM final {
      * once it has finished with it.
      */
     const uint8_t* generateKeys(
-        const uint8_t accountId[20],
-        uint8_t newSecretKey[32],
-        uint8_t secretKey[32] = 0
+        const uint8_t accountId[AID_SIZE],
+        uint8_t newSecretKey[KEY_SIZE],
+        uint8_t secretKey[KEY_SIZE] = 0
     );
 
     /**
@@ -160,8 +165,8 @@ class HSM final {
      * once it has finished with it.
      */
     const uint8_t* signMessage(
-        const uint8_t accountId[20],
-        uint8_t secretKey[32],
+        const uint8_t accountId[AID_SIZE],
+        uint8_t secretKey[KEY_SIZE],
         const char* message
     );
 
@@ -170,7 +175,7 @@ class HSM final {
      * erases from the EEPROM drive the current keys. This function should be called
      * when the mobile device associated with the HSM has been lost or stolen.
      */
-    void eraseKeys(const uint8_t accountId[20]);
+    void eraseKeys(const uint8_t accountId[AID_SIZE]);
 
   private:
     uint8_t* accountId;
