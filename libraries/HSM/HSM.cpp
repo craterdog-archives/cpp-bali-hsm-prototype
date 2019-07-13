@@ -22,7 +22,7 @@ void loadState(
     size_t index = 0;
 
     // load the account Id
-    for (size_t i = 0; i < KEY_SIZE; i++) {
+    for (size_t i = 0; i < AID_SIZE; i++) {
         accountId[i] = EEPROM.read(index++);
     }
 
@@ -51,7 +51,7 @@ void saveState(
     if (accountId) {
 
         // save the account Id
-        for (size_t i = 0; i < KEY_SIZE; i++) {
+        for (size_t i = 0; i < AID_SIZE; i++) {
             EEPROM.write(index++, accountId[i]);
         }
 
@@ -152,14 +152,14 @@ HSM::HSM() {
     loadState(accountId, publicKey, encryptedKey);
 
     // check to see if an accountId exists
-    for (size_t i = 0; i < KEY_SIZE; i++) {
+    for (size_t i = 0; i < AID_SIZE; i++) {
         if (accountId[i] != 0x00) return;  // accountId exists
     }
 
     // if no accountId, delete the state
-    delete [] accountId;
-    delete [] publicKey;
-    delete [] encryptedKey;
+    erase(accountId, AID_SIZE);
+    erase(publicKey, KEY_SIZE);
+    erase(encryptedKey, KEY_SIZE);
 }
 
 
