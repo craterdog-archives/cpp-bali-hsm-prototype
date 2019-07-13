@@ -38,7 +38,11 @@ void loadState(uint8_t accountId[20], uint8_t publicKey[32], uint8_t encryptedKe
  * This function saves the current state of the hardware security module (HSM)
  * to the EEPROM drive.
  */
-void saveState(const uint8_t accountId[20], const uint8_t publicKey[32], const uint8_t encryptedKey[32]) {
+void saveState(
+    const uint8_t accountId[20],
+    const uint8_t publicKey[32] = 0,
+    const uint8_t encryptedKey[32] = 0
+) {
     size_t index = 0;
 
     // save the account Id
@@ -47,13 +51,17 @@ void saveState(const uint8_t accountId[20], const uint8_t publicKey[32], const u
     }
 
     // save the public key
-    for (size_t i = 0; i < 32; i++) {
-        EEPROM.write(index++, publicKey[i]);
+    if (publicKey) {
+        for (size_t i = 0; i < 32; i++) {
+            EEPROM.write(index++, publicKey[i]);
+        }
     }
 
     // save the encrypted key
-    for (size_t i = 0; i < 32; i++) {
-        EEPROM.write(index++, encryptedKey[i]);
+    if (encryptedKey) {
+        for (size_t i = 0; i < 32; i++) {
+            EEPROM.write(index++, encryptedKey[i]);
+        }
     }
 }
 
@@ -111,10 +119,23 @@ bool invalidKeyPair(const uint8_t publicKey[32], const uint8_t privateKey[32]) {
 // PUBLIC METHODS
 
 HSM::HSM() {
+    // allocate space for state
     accountId = new uint8_t[20];
     publicKey = new uint8_t[32];
     encryptedKey = new uint8_t[32];
+
+    // load the state from persistent memory
     loadState(accountId, publicKey, encryptedKey);
+
+    // check to see if an accountId exists
+    for (size_t i = 0; i < 20; i++) {
+        if (accountId[i] != 0x00) return;
+    }
+
+    // if no accountId, delete the state
+    delete [] accountId;
+    delete [] publicKey;
+    delete [] encryptedKey;
 }
 
 
@@ -138,7 +159,12 @@ HSM::~HSM() {
 }
 
 
-bool HSM::registerAccount(const uint8_t accountId) {
+bool HSM::registerAccount(const uint8_t newAccountId[20]) {
+    if (accountId) return false;  // already registered
+    accountId = new uint8_t[20];
+    memcpy(accountId, newAccountId, 20);
+    saveState(accountId);
+    return true;
 }
 
 

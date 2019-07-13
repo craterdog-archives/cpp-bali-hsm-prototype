@@ -90,7 +90,7 @@ class HSM final {
     * hardware security module (HSM). Once registered to that accountId, this function
     * cannot be called again successfully.
     */
-   bool registerAccount(const uint8_t accountId);
+   bool registerAccount(const uint8_t accountId[20]);
 
     /**
      * This function is passed, from a mobile device, a message. It generates, for the
