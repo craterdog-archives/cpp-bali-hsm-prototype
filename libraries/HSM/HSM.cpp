@@ -211,7 +211,7 @@ bool HSM::validSignature(
     const uint8_t aPublicKey[KEY_SIZE]
 ) {
     size_t messageLength = strlen(message);
-    const uint8_t* aPublicKey = aPublicKey ? publicKey;  // default to the HSM public key
+    aPublicKey = aPublicKey ? aPublicKey : publicKey;  // default to the HSM public key
     bool isValid = Ed25519::verify(signature, aPublicKey, (const void*) message, messageLength);
     return isValid;
 }
