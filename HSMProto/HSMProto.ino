@@ -16,6 +16,7 @@ HSM* hsm;
 
 // These are just here for testing
 uint8_t* randomBytes(size_t length);
+uint8_t* accountId = randomBytes(20);
 const char* lastMessage = strdup("");
 uint8_t* lastSecretKey = randomBytes(32);
 const uint8_t* lastPublicKey;
@@ -65,7 +66,7 @@ void loop(void) {
                 Serial.println(message);
 
                 // digest the message
-                const uint8_t* digest = hsm->digestMessage(message);
+                const uint8_t* digest = hsm->digestMessage(accountId, message);
                 const char* encodedDigest = Codex::encode(digest, 64);
                 Serial.print("digest: ");
                 Serial.println(encodedDigest);
@@ -105,7 +106,7 @@ void loop(void) {
                 const uint8_t* signature = getSignature(encodedSignature);
 
                 // validate the signature
-                bool isValid = hsm->validSignature(aPublicKey, message, signature);
+                bool isValid = hsm->validSignature(accountId, message, signature, aPublicKey);
                 Serial.print("is valid: ");
                 Serial.println(isValid);
                 Serial.println("");
@@ -124,7 +125,7 @@ void loop(void) {
                 uint8_t* secretKey = getSecretKey(encodedSecretKey);
 
                 // generate the new keys
-                const uint8_t* publicKey = hsm->generateKeys(secretKey);
+                const uint8_t* publicKey = hsm->generateKeys(accountId, secretKey);
                 delete [] lastPublicKey;
                 lastPublicKey = publicKey;
                 const char* encodedPublicKey = Codex::encode(publicKey, 32);
@@ -134,7 +135,7 @@ void loop(void) {
                 delete [] encodedPublicKey;
 
                 // sign the new public key
-                const uint8_t* signature = hsm->signMessage(secretKey, encodedPublicKey);
+                const uint8_t* signature = hsm->signMessage(accountId, secretKey, encodedPublicKey);
                 delete [] lastSignature;
                 lastSignature = signature;
                 const char* encodedSignature = Codex::encode(signature, 64);
@@ -166,7 +167,7 @@ void loop(void) {
                 Serial.println(message);
 
                 // sign the message
-                const uint8_t* signature = hsm->signMessage(secretKey, message);
+                const uint8_t* signature = hsm->signMessage(accountId, secretKey, message);
                 delete [] lastSignature;
                 lastSignature = signature;
                 const char* encodedSignature = Codex::encode(signature, 64);
@@ -180,7 +181,7 @@ void loop(void) {
             // eraseKeys
             case 'e': {
                 Serial.println("eraseKeys");
-                hsm->eraseKeys();
+                hsm->eraseKeys(accountId);
                 break;
             }
 

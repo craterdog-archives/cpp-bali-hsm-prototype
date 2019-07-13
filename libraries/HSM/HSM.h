@@ -85,6 +85,13 @@ class HSM final {
      */
    ~HSM();
 
+   /**
+    * This function is passed, from a mobile device, an accountId for the user of the
+    * hardware security module (HSM). Once registered to that accountId, this function
+    * cannot be called again successfully.
+    */
+   bool registerAccount(const uint8_t accountId);
+
     /**
      * This function is passed, from a mobile device, a message. It generates, for the
      * message, a digest that can be used later to verify that the content of the message
@@ -92,18 +99,26 @@ class HSM final {
      * returned from the function. It is the responsibilty of the calling program to
      * 'delete []' the digest once it has finished with it.
      */
-    const uint8_t* digestMessage(const char* message);
+    const uint8_t* digestMessage(const uint8_t accountId[20], const char* message);
 
     /**
-     * This function is passed, from a mobile device, a public key, a message, and a
-     * digital signature that may or may not belong to the message. It checks to see
-     * whether or not the digital signature was created for the message using the
-     * private key associated with the specified public key. Note, the specified public
-     * key may or may not be the same public key that is associated with the private key
-     * maintained by the HSM. The function returns whether or not the digital signature
-     * is valid.
+     * This function is passed, from a mobile device, a message, and a digital signature
+     * that may belong to the message, and a public key that will be used to validate
+     * the signature. The function checks to see whether or not the digital signature was
+     * created for the message using the private key associated with the specified public
+     * key. Note, the specified public key may or may not be the same public key that is
+     * associated with the private key maintained by the HSM. The function returns a value
+     * describing whether or not the digital signature is valid.
+     *
+     * If a public key is not specified, the public key associated with the current
+     * private key in the hardware security module (HSM) is used.
      */
-    bool validSignature(const uint8_t aPublicKey[32], const char* message, const uint8_t signature[64]);
+    bool validSignature(
+        const uint8_t accountId[20],
+        const char* message,
+        const uint8_t signature[64],
+        const uint8_t aPublicKey[32] = 0
+    );
 
     /**
      * This function is passed, from a mobile device, a new secret key. It generates a
@@ -122,7 +137,11 @@ class HSM final {
      * It is the responsibilty of the calling program to 'delete []' the public key
      * once it has finished with it.
      */
-    const uint8_t* generateKeys(uint8_t newSecretKey[32], uint8_t secretKey[32] = 0);
+    const uint8_t* generateKeys(
+        const uint8_t accountId[20],
+        uint8_t newSecretKey[32],
+        uint8_t secretKey[32] = 0
+    );
 
     /**
      * This function is passed, from a mobile device, a secret key and a message to be
@@ -140,18 +159,23 @@ class HSM final {
      * It is the responsibilty of the calling program to 'delete []' the signature
      * once it has finished with it.
      */
-    const uint8_t* signMessage(uint8_t secretKey[32], const char* message);
+    const uint8_t* signMessage(
+        const uint8_t accountId[20],
+        uint8_t secretKey[32],
+        const char* message
+    );
 
     /**
      * This function erases from the processor memory all current and past keys and
      * erases from the EEPROM drive the current keys. This function should be called
      * when the mobile device associated with the HSM has been lost or stolen.
      */
-    void eraseKeys();
+    void eraseKeys(const uint8_t accountId[20]);
 
   private:
-    uint8_t publicKey[32];
-    uint8_t encryptedKey[32];
+    uint8_t* accountId;
+    uint8_t* publicKey;
+    uint8_t* encryptedKey;
     uint8_t* previousPublicKey;
     uint8_t* previousEncryptedKey;
 

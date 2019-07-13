@@ -14,11 +14,22 @@
  * This function loads the saved state of the hardware security module (HSM)
  * from the EEPROM drive.
  */
-void loadState(uint8_t publicKey[32], uint8_t encryptedKey[32]) {
+void loadState(uint8_t accountId[20], uint8_t publicKey[32], uint8_t encryptedKey[32]) {
+    size_t index = 0;
+
+    // load the account Id
+    for (size_t i = 0; i < 20; i++) {
+        accountId[i] = EEPROM.read(index++);
+    }
+
+    // load the public key
     for (size_t i = 0; i < 32; i++) {
-        // the bytes are interleaved
-        publicKey[i] = EEPROM.read(i * 2);
-        encryptedKey[i] = EEPROM.read(i * 2 + 1);
+        publicKey[i] = EEPROM.read(index++);
+    }
+
+    // load the encrypted key
+    for (size_t i = 0; i < 32; i++) {
+        encryptedKey[i] = EEPROM.read(index++);
     }
 }
 
@@ -27,11 +38,22 @@ void loadState(uint8_t publicKey[32], uint8_t encryptedKey[32]) {
  * This function saves the current state of the hardware security module (HSM)
  * to the EEPROM drive.
  */
-void saveState(const uint8_t publicKey[32], const uint8_t encryptedKey[32]) {
+void saveState(const uint8_t accountId[20], const uint8_t publicKey[32], const uint8_t encryptedKey[32]) {
+    size_t index = 0;
+
+    // save the account Id
+    for (size_t i = 0; i < 20; i++) {
+        EEPROM.write(index++, accountId[i]);
+    }
+
+    // save the public key
     for (size_t i = 0; i < 32; i++) {
-        // interleave the bytes
-        EEPROM.write(i * 2, publicKey[i]);
-        EEPROM.write(i * 2 + 1, encryptedKey[i]);
+        EEPROM.write(index++, publicKey[i]);
+    }
+
+    // save the encrypted key
+    for (size_t i = 0; i < 32; i++) {
+        EEPROM.write(index++, encryptedKey[i]);
     }
 }
 
@@ -89,13 +111,24 @@ bool invalidKeyPair(const uint8_t publicKey[32], const uint8_t privateKey[32]) {
 // PUBLIC METHODS
 
 HSM::HSM() {
-    loadState(publicKey, encryptedKey);
+    accountId = new uint8_t[20];
+    publicKey = new uint8_t[32];
+    encryptedKey = new uint8_t[32];
+    loadState(accountId, publicKey, encryptedKey);
 }
 
 
 HSM::~HSM() {
-    erase(publicKey);
-    erase(encryptedKey);
+    if (accountId) {
+        erase(accountId, 20);
+        delete [] accountId;
+    }
+    if (publicKey) {
+        erase(publicKey);
+        delete [] publicKey;
+        erase(encryptedKey);
+        delete [] encryptedKey;
+    }
     if (previousPublicKey) {
         erase(previousPublicKey);
         delete [] previousPublicKey;
@@ -105,8 +138,12 @@ HSM::~HSM() {
 }
 
 
+bool HSM::registerAccount(const uint8_t accountId) {
+}
+
+
 // NOTE: The returned message digest must be deleted by the calling program.
-const uint8_t* HSM::digestMessage(const char* message) {
+const uint8_t* HSM::digestMessage(const uint8_t accountId[20], const char* message) {
     SHA512 digester;
     size_t messageLength = strlen(message);
     uint8_t* digest = new uint8_t[64];
@@ -119,7 +156,12 @@ const uint8_t* HSM::digestMessage(const char* message) {
 // NOTE: the specified public key need not be the same public key that is associated
 // with the hardware security module (HSM). It should be the key associated with the
 // private key that supposedly signed the message.
-bool HSM::validSignature(const uint8_t aPublicKey[32], const char* message, const uint8_t signature[64]) {
+bool HSM::validSignature(
+    const uint8_t accountId[20],
+    const char* message,
+    const uint8_t signature[64],
+    const uint8_t aPublicKey[32]
+) {
     size_t messageLength = strlen(message);
     bool isValid = Ed25519::verify(signature, aPublicKey, (const void*) message, messageLength);
     return isValid;
@@ -128,7 +170,7 @@ bool HSM::validSignature(const uint8_t aPublicKey[32], const char* message, cons
 
 // INVARIANT: newSecretKey and secretKey will have been erased when this function returns.
 // NOTE: The returned public key must be deleted by the calling program.
-const uint8_t* HSM::generateKeys(uint8_t newSecretKey[32], uint8_t secretKey[32]) {
+const uint8_t* HSM::generateKeys(const uint8_t accountId[20], uint8_t newSecretKey[32], uint8_t secretKey[32]) {
     uint8_t privateKey[32];
 
     // handle any previous keys
@@ -136,7 +178,7 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[32], uint8_t secretKey[32]
         // roll-back the previous regeneration attempt
         memcpy(publicKey, previousPublicKey, 32);
         memcpy(encryptedKey, previousEncryptedKey, 32);
-        saveState(publicKey, encryptedKey);
+        saveState(accountId, publicKey, encryptedKey);
         erase(previousPublicKey);
         delete [] previousPublicKey;
         erase(previousEncryptedKey);
@@ -168,7 +210,7 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[32], uint8_t secretKey[32]
 
     // encrypt and save the private key
     encryptKey(newSecretKey, privateKey, encryptedKey);  // erases newSecretKey and privateKey
-    saveState(publicKey, encryptedKey);
+    saveState(accountId, publicKey, encryptedKey);
 
     // return a copy of the public key
     uint8_t* copy = new uint8_t[32];
@@ -179,7 +221,7 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[32], uint8_t secretKey[32]
 
 // INVARIANT: secretKey will have been erased when this function returns.
 // NOTE: The returned signature must be deleted by the calling program.
-const uint8_t* HSM::signMessage(uint8_t secretKey[32], const char* message) {
+const uint8_t* HSM::signMessage(const uint8_t accountId[20], uint8_t secretKey[32], const char* message) {
     uint8_t privateKey[32];
 
     // handle any previous key state
@@ -215,17 +257,21 @@ const uint8_t* HSM::signMessage(uint8_t secretKey[32], const char* message) {
 
 
 // INVARIANT: No trace of any keys will remain when this function returns.
-void HSM::eraseKeys() {
+void HSM::eraseKeys(const uint8_t accountId[20]) {
 
     // erase all keys in memory
     erase(publicKey);
     erase(encryptedKey);
     erase(previousPublicKey);
-    delete [] previousPublicKey;
     erase(previousEncryptedKey);
-    delete [] previousEncryptedKey;
 
     // erase the state of the EEPROM drive
-    saveState(publicKey, encryptedKey);
+    saveState(accountId, publicKey, encryptedKey);
+
+    // clean up
+    delete [] publicKey;
+    delete [] encryptedKey;
+    delete [] previousPublicKey;
+    delete [] previousEncryptedKey;
 }
 
