@@ -91,6 +91,12 @@ class HSM final {
    ~HSM();
 
    /**
+    * This function resets the hardware security module (HSM) to an uninitialized
+    * state.
+    */
+   void resetHSM();
+
+   /**
     * This function is passed, from a mobile device, an account Id for the user of the
     * hardware security module (HSM). Once registered to that account Id, this function
     * cannot be called again successfully.

@@ -47,24 +47,34 @@ void saveState(
     const uint8_t publicKey[KEY_SIZE] = 0,
     const uint8_t encryptedKey[KEY_SIZE] = 0
 ) {
+    uint8_t current;
     size_t index = 0;
     if (accountId) {
 
         // save the account Id
         for (size_t i = 0; i < AID_SIZE; i++) {
-            EEPROM.write(index++, accountId[i]);
+            current = EEPROM.read(index);
+            // limited EEPROM life-time, only write to EEPROM if necessary
+            if (current != accountId[i]) EEPROM.write(index, accountId[i]);
+            index++;
         }
 
         if (publicKey) {
 
             // save the public key
             for (size_t i = 0; i < KEY_SIZE; i++) {
-                EEPROM.write(index++, publicKey[i]);
+                current = EEPROM.read(index);
+                // limited EEPROM life-time, only write to EEPROM if necessary
+                if (current != publicKey[i]) EEPROM.write(index, publicKey[i]);
+                index++;
             }
 
             // save the encrypted key
             for (size_t i = 0; i < KEY_SIZE; i++) {
-                EEPROM.write(index++, encryptedKey[i]);
+                current = EEPROM.read(index);
+                // limited EEPROM life-time, only write to EEPROM if necessary
+                if (current != encryptedKey[i]) EEPROM.write(index, encryptedKey[i]);
+                index++;
             }
         }
     }
@@ -186,6 +196,15 @@ HSM::~HSM() {
     if (previousPublicKey) {
         erase(previousPublicKey, KEY_SIZE);
         erase(previousEncryptedKey, KEY_SIZE);
+    }
+}
+
+
+void resetHSM() {
+    for (size_t i = 0; i < EEPROM.length(); i++) {
+        uint8_t current = EEPROM.read(i);
+        // limited EEPROM life-time, only write to EEPROM if necessary
+        if (current != 0) EEPROM.write(i, 0x00);
     }
 }
 

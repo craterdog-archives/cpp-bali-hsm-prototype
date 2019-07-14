@@ -12,15 +12,20 @@
 Adafruit_BluefruitLE_SPI bluetooth(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 
+// Forward declarations
 HSM* hsm;
 
-// These are just here for testing
-uint8_t* randomBytes(size_t length);
-uint8_t* accountId = randomBytes(20);
-const char* lastMessage = strdup("");
-uint8_t* lastSecretKey = randomBytes(32);
-const uint8_t* lastPublicKey;
-const uint8_t* lastSignature;
+int32_t readRequest(void);
+uint8_t** readArguments(void);
+void deleteArguments(uint8_t**);
+void writeResult(uint8_t* result, size_t length = 0);
+void registerAccount(void);
+void digestMessage(void);
+void validSignature(void);
+void generateKeys(void);
+void signMessage(void);
+void eraseKeys(void);
+void testHSM(void);
 
 
 /*
@@ -48,144 +53,104 @@ void loop(void) {
         digitalWrite(LED_BUILTIN, LOW);   // turn the LED off by making the voltage LOW
 
         // read the next request
-        bluetooth.readline();
-        const char* request = bluetooth.buffer;
-        Serial.print("request: ");
-        Serial.println(request);
+        int32_t request = readRequest();
+        Serial.print("Request: ");
+        uint8_t** arguments = readArguments();
 
-        switch (request[0]) {
-            // digestMessage
-            case 'd': {
-                // read the message
-                Serial.println("digestMessage: enter the message");
-                while (!bluetooth.available()) delay(500);
-                bluetooth.readline();
-                const char* message = bluetooth.buffer;
-                message = getMessage(message);  // just for testing
-                Serial.print("message: ");
-                Serial.println(message);
-
-                // digest the message
-                const uint8_t* digest = hsm->digestMessage(accountId, message);
-                const char* encodedDigest = Codex::encode(digest, 64);
-                Serial.print("digest: ");
-                Serial.println(encodedDigest);
+        switch (request) {
+            // registerAccount
+            case 1: {
+                Serial.println("Register Account");
+                const uint8_t* anAccountId = arguments[0];
+                boolean success = hsm->registerAccount(anAccountId);
+                writeResult(success);
+                Serial.println(success ? "Succeeded" : "Failed");
                 Serial.println("");
-                delete [] digest;
-                delete [] encodedDigest;
+                deleteArguments(arguments);
+                break;
+            }
+
+            // digestMessage
+            case 2: {
+                Serial.println("Digest Message");
+                const uint8_t* anAccountId = arguments[0];
+                const char* message = (const char*) arguments[1];
+                const uint8_t* digest = hsm->digestMessage(anAccountId, message);
+                writeResult(digest, sizeof digest);
+                Serial.println(digest ? "Succeeded" : "Failed");
+                Serial.println("");
+                deleteArguments(arguments);
                 break;
             }
 
             // validSignature
-            case 'v': {
-                // read the public key
-                Serial.println("validSignature: enter a public key");
-                while (!bluetooth.available()) delay(500);
-                bluetooth.readline();
-                const char* encodedPublicKey = bluetooth.buffer;
-                Serial.print("a public key: ");
-                Serial.println(encodedPublicKey);
-                const uint8_t* aPublicKey = getPublicKey(encodedPublicKey);
-
-                // read the message
-                Serial.println("validSignature: enter the message");
-                while (!bluetooth.available()) delay(500);
-                bluetooth.readline();
-                const char* message = bluetooth.buffer;
-                message = getMessage(message);  // just for testing
-                Serial.print("message: ");
-                Serial.println(message);
-
-                // read the signature
-                Serial.println("validSignature: enter the signature");
-                while (!bluetooth.available()) delay(500);
-                bluetooth.readline();
-                const char* encodedSignature = bluetooth.buffer;
-                Serial.print("signature: ");
-                Serial.println(encodedSignature);
-                const uint8_t* signature = getSignature(encodedSignature);
-
-                // validate the signature
-                bool isValid = hsm->validSignature(accountId, message, signature, aPublicKey);
-                Serial.print("is valid: ");
-                Serial.println(isValid);
+            case 3: {
+                Serial.println("Valid Signature?");
+                const uint8_t* anAccountId = arguments[0];
+                const char* message = (const char*) arguments[1];
+                const uint8_t* signature = arguments[2];
+                const uint8_t* aPublicKey = (sizeof arguments == 4) ? arguments[3] : 0;
+                bool isValid = hsm->validSignature(anAccountId, message, signature, aPublicKey);
+                writeResult((const uint8_t*) isValid);
+                Serial.println(isValid ? "Succeeded" : "Failed");
                 Serial.println("");
+                deleteArguments(arguments);
                 break;
             }
  
             // generateKeys
-            case 'g': {
-                // read the secret key
-                Serial.println("generateKeys: enter the secret key");
-                while (!bluetooth.available()) delay(500);
-                bluetooth.readline();
-                const char* encodedSecretKey = bluetooth.buffer;
-                Serial.print("secret key: ");
-                Serial.println(encodedSecretKey);
-                uint8_t* secretKey = getSecretKey(encodedSecretKey);
-
-                // generate the new keys
-                const uint8_t* publicKey = hsm->generateKeys(accountId, secretKey);
-                delete [] lastPublicKey;
-                lastPublicKey = publicKey;
-                const char* encodedPublicKey = Codex::encode(publicKey, 32);
-                Serial.print("publicKey: ");
-                Serial.println(encodedPublicKey);
+            case 4: {
+                Serial.println("(Re)Generate Keys");
+                const uint8_t* anAccountId = arguments[0];
+                uint8_t* newSecretKey = arguments[1];
+                uint8_t* secretKey = (sizeof arguments == 3) ? arguments[2] : 0;
+                const uint8_t* publicKey = hsm->generateKeys(anAccountId, newSecretKey, secretKey);
+                writeResult(publicKey, sizeof publicKey);
+                Serial.println(publicKey ? "Succeeded" : "Failed");
                 Serial.println("");
-                delete [] encodedPublicKey;
-
-                // sign the new public key
-                const uint8_t* signature = hsm->signMessage(accountId, secretKey, encodedPublicKey);
-                delete [] lastSignature;
-                lastSignature = signature;
-                const char* encodedSignature = Codex::encode(signature, 64);
-                Serial.print("signature: ");
-                Serial.println(encodedSignature);
-                Serial.println("");
-                delete [] encodedSignature;
+                deleteArguments(arguments);
                 break;
             }
  
             // signMessage
-            case 's': {
-                // read the secret key
-                Serial.println("signMessage: enter the secret key");
-                while (!bluetooth.available()) delay(500);
-                bluetooth.readline();
-                const char* encodedSecretKey = bluetooth.buffer;
-                Serial.print("secret key: ");
-                Serial.println(encodedSecretKey);
-                uint8_t* secretKey = getSecretKey(encodedSecretKey);
-
-                // read the message
-                Serial.println("signMessage: enter the message");
-                while (!bluetooth.available()) delay(500);
-                bluetooth.readline();
-                const char* message = bluetooth.buffer;
-                message = getMessage(message);  // just for testing
-                Serial.print("message: ");
-                Serial.println(message);
-
-                // sign the message
-                const uint8_t* signature = hsm->signMessage(accountId, secretKey, message);
-                delete [] lastSignature;
-                lastSignature = signature;
-                const char* encodedSignature = Codex::encode(signature, 64);
-                Serial.print("signature: ");
-                Serial.println(encodedSignature);
+            case 5: {
+                Serial.println("Sign Message");
+                const uint8_t* anAccountId = arguments[0];
+                uint8_t* secretKey = arguments[1];
+                const char* message = (const char*) arguments[2];
+                const uint8_t* signature = hsm->signMessage(anAccountId, secretKey, message);
+                writeResult(signature, sizeof signature);
+                Serial.println(signature ? "Succeeded" : "Failed");
                 Serial.println("");
-                delete [] encodedSignature;
+                deleteArguments(arguments);
                 break;
             }
  
             // eraseKeys
-            case 'e': {
-                Serial.println("eraseKeys");
-                hsm->eraseKeys(accountId);
+            case 6: {
+                Serial.println("Erase Keys");
+                const uint8_t* anAccountId = arguments[0];
+                hsm->eraseKeys(anAccountId);
+                deleteArguments(arguments);
                 break;
             }
 
-            default: Serial.println("Invalid command, try again...");
+            // testHSM
+            case 42: {
+                Serial.println("Test HSM");
+                bool success = testHSM(arguments);
+                Serial.println(success ? "Succeeded" : "Failed");
+                Serial.println("");
+                deleteArguments(arguments);
+                break;
+            }
+
+            // invalid
+            default: {
+                Serial.println("Invalid, try again...");
+                Serial.println("");
+                break;
+            }
         }
 
     }
@@ -213,15 +178,6 @@ void initHSM() {
     hsm = new HSM();
     Serial.println("Done.");
     Serial.println("");
-}
-
-
-uint8_t* randomBytes(size_t length) {
-    uint8_t* bytes = new uint8_t[length];
-    for (size_t i = 0; i < length; i++) {
-        bytes[i] = (uint8_t) random(256);
-    }
-    return bytes;
 }
 
 
@@ -269,46 +225,73 @@ void initBluetooth() {
 }
 
 
-// The following code is just here for testing and should be removed once a real mobile
-// client has been developed.
+uint8_t* randomBytes(size_t length) {
+    uint8_t* bytes = new uint8_t[length];
+    for (size_t i = 0; i < length; i++) {
+        bytes[i] = (uint8_t) random(256);
+    }
+    return bytes;
+}
 
-const char* getMessage(const char* message) {
-    if (strcmp(message, "") == 0) {
-        return lastMessage;
-    } else {
-        delete [] lastMessage;
-        lastMessage = strdup(message);
+
+int32_t readRequest(void) {
+    int32_t request = bluetooth.readline_parseInt();
+    if ((request < 1 || request > 7) && request != 42) return 0;
+    return request;
+}
+
+
+uint8_t** readArguments(void) {
+    int32_t count = bluetooth.readline_parseInt();
+    uint8_t** arguments = new uint8_t*[count];
+    for (size_t i = 0; i < count; i++) {
+        int32_t length = bluetooth.readline_parseInt();
+        uint8_t* argument = new uint8_t[length];
+        for (size_t j = 0; j < length; j++) {
+            size_t timeout = 5;  // seconds
+            while (!bluetooth.available()) {
+                if (timeout--) {
+                    delay(1);  // wait a second
+                } else {
+                    // timed out so clean up and bail
+                    for (size_t k = 0; k < i; k++) {
+                        delete [] arguments[k];  // the arguments read in thus far
+                    }
+                    delete [] argument;  // the argument in progress
+                    delete [] arguments;  // the array of arguments
+                    return 0;
+                }
+            }
+            argument[j] = bluetooth.read();
+        }
+        arguments[i] = argument;
+    }
+    return arguments;
+}
+
+
+void deleteArguments(uint8_t** arguments) {
+    size_t count = sizeof arguments;
+    for (size_t i = 0; i < count; i++) {
+        uint8_t* argument = arguments[i];
+        delete [] argument;
+    }
+    delete [] arguments;
+}
+
+
+void writeResult(bool result) {
+    bluetooth.write((int) result);
+}
+
+
+void writeResult(const uint8_t* result, size_t length) {
+    for (size_t i = 0; i < length; i++) {
+        bluetooth.write(result[i]);
     }
 }
 
 
-uint8_t* getSecretKey(const char* encodedSecretKey) {
-    if (strcmp(encodedSecretKey, "") == 0) {
-        return lastSecretKey;
-    } else {
-        delete [] lastSecretKey;
-        lastSecretKey = Codex::decode(encodedSecretKey);
-    }
+bool testHSM(uint8_t** arguments) {
+
 }
-
-
-const uint8_t* getPublicKey(const char* encodedPublicKey) {
-    if (strcmp(encodedPublicKey, "") == 0) {
-        return lastPublicKey;
-    } else {
-        delete [] lastPublicKey;
-        lastPublicKey = Codex::decode(encodedPublicKey);
-    }
-}
-
-
-const uint8_t* getSignature(const char* encodedSignature) {
-    if (strcmp(encodedSignature, "") == 0) {
-        return lastSignature;
-    } else {
-        delete [] lastSignature;
-        lastSignature = Codex::decode(encodedSignature);
-    }
-}
-
-// End of test code.
