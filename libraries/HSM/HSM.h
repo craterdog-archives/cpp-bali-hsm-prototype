@@ -91,11 +91,11 @@ class HSM final {
    ~HSM();
 
    /**
-    * This function is passed, from a mobile device, an accountId for the user of the
-    * hardware security module (HSM). Once registered to that accountId, this function
+    * This function is passed, from a mobile device, an account Id for the user of the
+    * hardware security module (HSM). Once registered to that account Id, this function
     * cannot be called again successfully.
     */
-   bool registerAccount(const uint8_t accountId[AID_SIZE]);
+   bool registerAccount(const uint8_t anAccountId[AID_SIZE]);
 
     /**
      * This function is passed, from a mobile device, a message. It generates, for the
@@ -104,7 +104,7 @@ class HSM final {
      * returned from the function. It is the responsibilty of the calling program to
      * 'delete []' the digest once it has finished with it.
      */
-    const uint8_t* digestMessage(const uint8_t accountId[AID_SIZE], const char* message);
+    const uint8_t* digestMessage(const uint8_t anAccountId[AID_SIZE], const char* message);
 
     /**
      * This function is passed, from a mobile device, a message, and a digital signature
@@ -119,7 +119,7 @@ class HSM final {
      * private key in the hardware security module (HSM) is used.
      */
     bool validSignature(
-        const uint8_t accountId[AID_SIZE],
+        const uint8_t anAccountId[AID_SIZE],
         const char* message,
         const uint8_t signature[SIG_SIZE],
         const uint8_t aPublicKey[KEY_SIZE] = 0
@@ -143,7 +143,7 @@ class HSM final {
      * once it has finished with it.
      */
     const uint8_t* generateKeys(
-        const uint8_t accountId[AID_SIZE],
+        const uint8_t anAccountId[AID_SIZE],
         uint8_t newSecretKey[KEY_SIZE],
         uint8_t secretKey[KEY_SIZE] = 0
     );
@@ -165,7 +165,7 @@ class HSM final {
      * once it has finished with it.
      */
     const uint8_t* signMessage(
-        const uint8_t accountId[AID_SIZE],
+        const uint8_t anAccountId[AID_SIZE],
         uint8_t secretKey[KEY_SIZE],
         const char* message
     );
@@ -175,7 +175,7 @@ class HSM final {
      * erases from the EEPROM drive the current keys. This function should be called
      * when the mobile device associated with the HSM has been lost or stolen.
      */
-    void eraseKeys(const uint8_t accountId[AID_SIZE]);
+    void eraseKeys(const uint8_t anAccountId[AID_SIZE]);
 
   private:
     uint8_t* accountId;
