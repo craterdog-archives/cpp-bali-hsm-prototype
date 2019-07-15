@@ -19,12 +19,6 @@ int32_t readRequest(void);
 uint8_t** readArguments(void);
 void deleteArguments(uint8_t**);
 void writeResult(uint8_t* result, size_t length = 0);
-void registerAccount(void);
-void digestMessage(void);
-void validSignature(void);
-void generateKeys(void);
-void signMessage(void);
-void eraseKeys(void);
 void testHSM(void);
 
 
@@ -80,6 +74,7 @@ void loop(void) {
                 Serial.println(digest ? "Succeeded" : "Failed");
                 Serial.println("");
                 deleteArguments(arguments);
+                delete [] digest;
                 break;
             }
 
@@ -109,6 +104,7 @@ void loop(void) {
                 Serial.println(publicKey ? "Succeeded" : "Failed");
                 Serial.println("");
                 deleteArguments(arguments);
+                delete [] publicKey;
                 break;
             }
  
@@ -123,6 +119,7 @@ void loop(void) {
                 Serial.println(signature ? "Succeeded" : "Failed");
                 Serial.println("");
                 deleteArguments(arguments);
+                delete [] signature;
                 break;
             }
  
@@ -138,9 +135,7 @@ void loop(void) {
             // testHSM
             case 42: {
                 Serial.println("Test HSM");
-                bool success = testHSM(arguments);
-                Serial.println(success ? "Succeeded" : "Failed");
-                Serial.println("");
+                testHSM(arguments);
                 deleteArguments(arguments);
                 break;
             }
@@ -236,7 +231,7 @@ uint8_t* randomBytes(size_t length) {
 
 int32_t readRequest(void) {
     int32_t request = bluetooth.readline_parseInt();
-    if ((request < 1 || request > 7) && request != 42) return 0;
+    if ((request < 1 || request > 6) && request != 42) return 0;
     return request;
 }
 
@@ -292,6 +287,78 @@ void writeResult(const uint8_t* result, size_t length) {
 }
 
 
-bool testHSM(uint8_t** arguments) {
+void testHSM(uint8_t** arguments) {
+    Serial.println("Resetting the HSM...");
+    hsm->resetHSM();
+    Serial.println("Done.");
+    Serial.println("");
 
+    Serial.println("Registering a new account...");
+    const uint8_t* accountId = randomBytes(AID_SIZE);
+    bool success = hsm->registerAccount(accountId);
+    Serial.println(success ? Codex::encode(accountId, AID_SIZE) : "Failed.");
+    Serial.println("");
+
+    Serial.println("Generating a message diagest...");
+    const char* message = "This is a test of ButtonUp™.";
+    const uint8_t* digest = hsm->digestMessage(accountId, message);
+    Serial.println(digest ? Codex::encode(digest, DIG_SIZE) : "Failed.");
+    Serial.println("");
+
+    Serial.println("Generating an initial key pair...");
+    uint8_t* secretKey = randomBytes(KEY_SIZE);
+    const uint8_t* publicKey = hsm->generateKeys(accountId, secretKey);
+    Serial.println(publicKey ? Codex::encode(publicKey, KEY_SIZE) : "Failed.");
+    Serial.println("");
+
+    Serial.println("Signing the message...");
+    const uint8_t* signature = hsm->signMessage(accountId, secretKey, message);
+    Serial.println(signature ? Codex::encode(signature, SIG_SIZE) : "Failed.");
+    Serial.println("");
+
+    Serial.println("Validating the signature...");
+    bool isValid = hsm->validSignature(accountId, message, signature, publicKey);
+    Serial.println(isValid ? "Is Valid." : "Is Invalid.");
+    Serial.println("");
+
+    Serial.println("Generating a new key pair...");
+    uint8_t* newSecretKey = randomBytes(KEY_SIZE);
+    const uint8_t* newPublicKey = hsm->generateKeys(accountId, newSecretKey, secretKey);
+    Serial.println(newPublicKey ? Codex::encode(newPublicKey, KEY_SIZE) : "Failed.");
+    Serial.println("");
+
+    Serial.println("Signing the certificate...");
+    delete [] signature;
+    signature = hsm->signMessage(accountId, secretKey, (const char*) newPublicKey);
+    Serial.println(signature ? Codex::encode(signature, SIG_SIZE) : "Failed.");
+    Serial.println("");
+
+    Serial.println("Validating the signature...");
+    isValid = hsm->validSignature(accountId, (const char*) newPublicKey, signature, publicKey);
+    Serial.println(isValid ? "Is Valid." : "Is Invalid.");
+    Serial.println("");
+
+    Serial.println("Signing the message...");
+    delete [] signature;
+    signature = hsm->signMessage(accountId, newSecretKey, message);
+    Serial.println(signature ? Codex::encode(signature, SIG_SIZE) : "Failed.");
+    Serial.println("");
+
+    Serial.println("Validating the signature...");
+    isValid = hsm->validSignature(accountId, message, signature, newPublicKey);
+    Serial.println(isValid ? "Is Valid." : "Is Invalid.");
+    Serial.println("");
+
+    Serial.println("Erasing the keys...");
+    hsm->eraseKeys(accountId);
+    Serial.println("Succeeded.");
+    Serial.println("");
+
+    delete [] accountId;
+    delete [] digest;
+    delete [] secretKey;
+    delete [] newSecretKey;
+    delete [] publicKey;
+    delete [] newPublicKey;
+    delete [] signature;
 }

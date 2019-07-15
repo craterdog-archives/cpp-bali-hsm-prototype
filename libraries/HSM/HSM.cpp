@@ -8,7 +8,7 @@
 #include "HSM.h"
 
 
-// PRIVATE FUNCTIONS
+// PRIVATE FREE FUNCTIONS
 
 /**
  * This function loads the saved state of the hardware security module (HSM)
@@ -162,7 +162,7 @@ bool invalidKeyPair(
 }
 
 
-// PUBLIC METHODS
+// PUBLIC MEMBER FUNCTIONS
 
 HSM::HSM() {
     // allocate space for state
@@ -200,7 +200,7 @@ HSM::~HSM() {
 }
 
 
-void resetHSM() {
+void HSM::resetHSM() {
     for (size_t i = 0; i < EEPROM.length(); i++) {
         uint8_t current = EEPROM.read(i);
         // limited EEPROM life-time, only write to EEPROM if necessary
@@ -230,23 +230,6 @@ const uint8_t* HSM::digestMessage(
     digester.update((const void*) message, messageLength);
     digester.finalize(digest, DIG_SIZE);
     return digest;
-}
-
-
-// NOTE: the specified public key need not be the same public key that is associated
-// with the hardware security module (HSM). It should be the key associated with the
-// private key that supposedly signed the message.
-bool HSM::validSignature(
-    const uint8_t anAccountId[AID_SIZE],
-    const char* message,
-    const uint8_t signature[SIG_SIZE],
-    const uint8_t aPublicKey[KEY_SIZE]
-) {
-    if (invalidAccount(anAccountId, accountId)) return false;
-    size_t messageLength = strlen(message);
-    aPublicKey = aPublicKey ? aPublicKey : publicKey;  // default to the HSM public key
-    bool isValid = Ed25519::verify(signature, aPublicKey, (const void*) message, messageLength);
-    return isValid;
 }
 
 
@@ -346,6 +329,23 @@ const uint8_t* HSM::signMessage(
 
     // return the message signature
     return signature;
+}
+
+
+// NOTE: the specified public key need not be the same public key that is associated
+// with the hardware security module (HSM). It should be the key associated with the
+// private key that supposedly signed the message.
+bool HSM::validSignature(
+    const uint8_t anAccountId[AID_SIZE],
+    const char* message,
+    const uint8_t signature[SIG_SIZE],
+    const uint8_t aPublicKey[KEY_SIZE]
+) {
+    if (invalidAccount(anAccountId, accountId)) return false;
+    size_t messageLength = strlen(message);
+    aPublicKey = aPublicKey ? aPublicKey : publicKey;  // default to the HSM public key
+    bool isValid = Ed25519::verify(signature, aPublicKey, (const void*) message, messageLength);
+    return isValid;
 }
 
 

@@ -20,14 +20,14 @@
  *
  * The functions are split into two groups, the first which do not require access to
  * the private key:
- *  * digestMessage(message) => digest
- *  * validSignature(aPublicKey, message, signature) => boolean
+ *  * digestMessage(accountId, message) => digest
+ *  * validSignature(accountId, message, signature, aPublicKey) => isValid?
  *
  * and the second group which do involve the private key which has been encrypted
  * using a secret key that is passed in from a mobile device:
- *  * generateKeys(secretKey) => publicKey
- *  * signMessage(secretKey, message => signature
- *  * eraseKeys()
+ *  * generateKeys(accountId, secretKey) => publicKey
+ *  * signMessage(accountId, secretKey, message) => signature
+ *  * eraseKeys(accountId) => success?
  *
  * The private key is encrypted using the secret key as follows:
  *    secretKey XOR privateKey => encryptedKey
@@ -113,25 +113,6 @@ class HSM final {
     const uint8_t* digestMessage(const uint8_t anAccountId[AID_SIZE], const char* message);
 
     /**
-     * This function is passed, from a mobile device, a message, and a digital signature
-     * that may belong to the message, and a public key that will be used to validate
-     * the signature. The function checks to see whether or not the digital signature was
-     * created for the message using the private key associated with the specified public
-     * key. Note, the specified public key may or may not be the same public key that is
-     * associated with the private key maintained by the HSM. The function returns a value
-     * describing whether or not the digital signature is valid.
-     *
-     * If a public key is not specified, the public key associated with the current
-     * private key in the hardware security module (HSM) is used.
-     */
-    bool validSignature(
-        const uint8_t anAccountId[AID_SIZE],
-        const char* message,
-        const uint8_t signature[SIG_SIZE],
-        const uint8_t aPublicKey[KEY_SIZE] = 0
-    );
-
-    /**
      * This function is passed, from a mobile device, a new secret key. It generates a
      * new public-private key pair and uses the new secret key to encrypt the new
      * private key using the XOR operation to generate a new encrypted key. Then the
@@ -174,6 +155,25 @@ class HSM final {
         const uint8_t anAccountId[AID_SIZE],
         uint8_t secretKey[KEY_SIZE],
         const char* message
+    );
+
+    /**
+     * This function is passed, from a mobile device, a message, and a digital signature
+     * that may belong to the message, and a public key that will be used to validate
+     * the signature. The function checks to see whether or not the digital signature was
+     * created for the message using the private key associated with the specified public
+     * key. Note, the specified public key may or may not be the same public key that is
+     * associated with the private key maintained by the HSM. The function returns a value
+     * describing whether or not the digital signature is valid.
+     *
+     * If a public key is not specified, the public key associated with the current
+     * private key in the hardware security module (HSM) is used.
+     */
+    bool validSignature(
+        const uint8_t anAccountId[AID_SIZE],
+        const char* message,
+        const uint8_t signature[SIG_SIZE],
+        const uint8_t aPublicKey[KEY_SIZE] = 0
     );
 
     /**
