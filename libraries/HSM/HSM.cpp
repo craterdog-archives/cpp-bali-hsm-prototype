@@ -224,6 +224,10 @@ HSM::HSM() {
     Serial.println(F("account does not exist..."));
     erase(accountId, AID_SIZE);
     accountId = 0;
+    erase(publicKey, KEY_SIZE);
+    publicKey = 0;
+    erase(encryptedKey, KEY_SIZE);
+    encryptedKey = 0;
 }
 
 
@@ -276,7 +280,7 @@ void HSM::resetHSM() {
 }
 
 
-bool HSM::registerAccount(const uint8_t anAccountId[KEY_SIZE]) {
+bool HSM::registerAccount(const uint8_t anAccountId[AID_SIZE]) {
     if (accountId) {
         Serial.println(F("account is already registered..."));
         return false;  // already registered

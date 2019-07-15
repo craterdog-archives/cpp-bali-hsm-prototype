@@ -322,7 +322,7 @@ void testHSM(uint8_t** arguments) {
     }
     Serial.println(F(""));
 
-    Serial.println(F("Generating a message diagest..."));
+    Serial.println(F("Generating a message digest..."));
     const char* message = "This is a test of ButtonUp™.";
     const uint8_t* digest = hsm->digestMessage(accountId, message);
     if (digest) {
