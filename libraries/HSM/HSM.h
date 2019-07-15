@@ -178,10 +178,13 @@ class HSM final {
 
     /**
      * This function erases from the processor memory all current and past keys and
-     * erases from the EEPROM drive the current keys. This function should be called
-     * when the mobile device associated with the HSM has been lost or stolen.
+     * erases from the EEPROM drive the current keys. The specified account Id must
+     * match the account Id stored on the HSM or nothing is erased. This function
+     * should be called when the mobile device associated with the HSM has been lost
+     * or stolen. The function returns a value describing whether or not the keys
+     * were erased.
      */
-    void eraseKeys(const uint8_t anAccountId[AID_SIZE]);
+    bool eraseKeys(const uint8_t anAccountId[AID_SIZE]);
 
   private:
     uint8_t* accountId;

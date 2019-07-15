@@ -19,6 +19,7 @@ int32_t readRequest(void);
 uint8_t** readArguments(void);
 void deleteArguments(uint8_t**);
 void writeResult(uint8_t* result, size_t length = 0);
+void eraseKey(uint8_t* key);
 void testHSM(void);
 
 
@@ -78,8 +79,44 @@ void loop(void) {
                 break;
             }
 
-            // validSignature
+            // generateKeys
             case 3: {
+                Serial.println("(Re)Generate Keys");
+                const uint8_t* anAccountId = arguments[0];
+                uint8_t* newSecretKey = arguments[1];
+                uint8_t* secretKey = (sizeof arguments == 3) ? arguments[2] : 0;
+                const uint8_t* publicKey = hsm->generateKeys(anAccountId, newSecretKey, secretKey);
+                eraseKey(newSecretKey);
+                newSecretKey = 0;
+                eraseKey(secretKey);
+                secretKey = 0;
+                writeResult(publicKey, sizeof publicKey);
+                Serial.println(publicKey ? "Succeeded" : "Failed");
+                Serial.println("");
+                deleteArguments(arguments);
+                delete [] publicKey;
+                break;
+            }
+ 
+            // signMessage
+            case 4: {
+                Serial.println("Sign Message");
+                const uint8_t* anAccountId = arguments[0];
+                uint8_t* secretKey = arguments[1];
+                const char* message = (const char*) arguments[2];
+                const uint8_t* signature = hsm->signMessage(anAccountId, secretKey, message);
+                eraseKey(secretKey);
+                secretKey = 0;
+                writeResult(signature, sizeof signature);
+                Serial.println(signature ? "Succeeded" : "Failed");
+                Serial.println("");
+                deleteArguments(arguments);
+                delete [] signature;
+                break;
+            }
+ 
+            // validSignature
+            case 5: {
                 Serial.println("Valid Signature?");
                 const uint8_t* anAccountId = arguments[0];
                 const char* message = (const char*) arguments[1];
@@ -93,41 +130,14 @@ void loop(void) {
                 break;
             }
  
-            // generateKeys
-            case 4: {
-                Serial.println("(Re)Generate Keys");
-                const uint8_t* anAccountId = arguments[0];
-                uint8_t* newSecretKey = arguments[1];
-                uint8_t* secretKey = (sizeof arguments == 3) ? arguments[2] : 0;
-                const uint8_t* publicKey = hsm->generateKeys(anAccountId, newSecretKey, secretKey);
-                writeResult(publicKey, sizeof publicKey);
-                Serial.println(publicKey ? "Succeeded" : "Failed");
-                Serial.println("");
-                deleteArguments(arguments);
-                delete [] publicKey;
-                break;
-            }
- 
-            // signMessage
-            case 5: {
-                Serial.println("Sign Message");
-                const uint8_t* anAccountId = arguments[0];
-                uint8_t* secretKey = arguments[1];
-                const char* message = (const char*) arguments[2];
-                const uint8_t* signature = hsm->signMessage(anAccountId, secretKey, message);
-                writeResult(signature, sizeof signature);
-                Serial.println(signature ? "Succeeded" : "Failed");
-                Serial.println("");
-                deleteArguments(arguments);
-                delete [] signature;
-                break;
-            }
- 
             // eraseKeys
             case 6: {
                 Serial.println("Erase Keys");
                 const uint8_t* anAccountId = arguments[0];
-                hsm->eraseKeys(anAccountId);
+                bool isValid = hsm->eraseKeys(anAccountId);
+                writeResult((const uint8_t*) isValid);
+                Serial.println(isValid ? "Succeeded" : "Failed");
+                Serial.println("");
                 deleteArguments(arguments);
                 break;
             }
@@ -283,6 +293,14 @@ void writeResult(bool result) {
 void writeResult(const uint8_t* result, size_t length) {
     for (size_t i = 0; i < length; i++) {
         bluetooth.write(result[i]);
+    }
+}
+
+
+void eraseKey(uint8_t* key) {
+    if (key) {
+        memset(key, 0x00, KEY_SIZE);
+        delete [] key;
     }
 }
 
