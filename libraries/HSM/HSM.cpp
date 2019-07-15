@@ -12,32 +12,67 @@
 // PRIVATE FREE FUNCTIONS
 
 /**
- * This function loads the saved state of the hardware security module (HSM)
- * from the EEPROM drive.
+ * This function loads the saved account Id from the EEPROM drive.
  */
-void loadState(
-    uint8_t accountId[AID_SIZE],
-    uint8_t publicKey[KEY_SIZE],
-    uint8_t encryptedKey[KEY_SIZE]
-) {
+bool loadAccount(uint8_t accountId[AID_SIZE]) {
     size_t index = 0;
+    bool accountExists = false;
 
     // load the account Id
-    Serial.println("loading the account Id...");
+    Serial.println(F("loading the account Id..."));
     for (size_t i = 0; i < AID_SIZE; i++) {
         accountId[i] = EEPROM.read(index++);
+        if (accountId[i] != 0x00) accountExists = true;
     }
+
+    return accountExists;
+}
+
+
+/**
+ * This function loads the saved keys from the EEPROM drive.
+ */
+bool loadKeys(uint8_t publicKey[KEY_SIZE], uint8_t encryptedKey[KEY_SIZE]) {
+    size_t index = AID_SIZE;
+    bool keysExist = false;
 
     // load the public key
-    Serial.println("loading the public key...");
+    Serial.println(F("loading the public key..."));
     for (size_t i = 0; i < KEY_SIZE; i++) {
         publicKey[i] = EEPROM.read(index++);
+        if (publicKey[i] != 0x00) keysExist = true;
     }
 
-    // load the encrypted key
-    Serial.println("loading the encrypted key...");
-    for (size_t i = 0; i < KEY_SIZE; i++) {
-        encryptedKey[i] = EEPROM.read(index++);
+    if (keysExist) {
+        // load the encrypted key
+        Serial.println(F("loading the encrypted key..."));
+        for (size_t i = 0; i < KEY_SIZE; i++) {
+            encryptedKey[i] = EEPROM.read(index++);
+        }
+    }
+
+    return keysExist;
+}
+
+
+/**
+ * This function saves the account Id to the EEPROM drive.
+ */
+void saveAccount(const uint8_t accountId[AID_SIZE]) {
+    uint8_t current;
+    size_t index = 0;
+
+    // save the account Id
+    for (size_t i = 0; i < AID_SIZE; i++) {
+        current = EEPROM.read(index);
+        // limited EEPROM life-time, only write to EEPROM if necessary
+        if (current != accountId[i]) {
+            Serial.print(F("writing account Id to EEPROM["));
+            Serial.print(index);
+            Serial.println(F("]"));
+            EEPROM.write(index, accountId[i]);
+        }
+        index++;
     }
 }
 
@@ -46,55 +81,36 @@ void loadState(
  * This function saves the current state of the hardware security module (HSM)
  * to the EEPROM drive.
  */
-void saveState(
-    const uint8_t accountId[AID_SIZE],
-    const uint8_t publicKey[KEY_SIZE] = 0,
-    const uint8_t encryptedKey[KEY_SIZE] = 0
-) {
+void saveKeys(const uint8_t publicKey[KEY_SIZE], const uint8_t encryptedKey[KEY_SIZE]) {
     uint8_t current;
     size_t index = 0;
-    if (accountId) {
 
-        // save the account Id
-        for (size_t i = 0; i < AID_SIZE; i++) {
+    if (publicKey) {
+
+        // save the public key
+        for (size_t i = 0; i < KEY_SIZE; i++) {
             current = EEPROM.read(index);
             // limited EEPROM life-time, only write to EEPROM if necessary
-            if (current != accountId[i]) {
-                Serial.print("writing account Id to EEPROM[");
+            if (current != publicKey[i]) {
+                Serial.print(F("writing public key to EEPROM["));
                 Serial.print(index);
-                Serial.println("]");
-                EEPROM.write(index, accountId[i]);
+                Serial.println(F("]"));
+                EEPROM.write(index, publicKey[i]);
             }
             index++;
         }
 
-        if (publicKey) {
-
-            // save the public key
-            for (size_t i = 0; i < KEY_SIZE; i++) {
-                current = EEPROM.read(index);
-                // limited EEPROM life-time, only write to EEPROM if necessary
-                if (current != publicKey[i]) {
-                    Serial.print("writing public key to EEPROM[");
-                    Serial.print(index);
-                    Serial.println("]");
-                    EEPROM.write(index, publicKey[i]);
-                }
-                index++;
+        // save the encrypted key
+        for (size_t i = 0; i < KEY_SIZE; i++) {
+            current = EEPROM.read(index);
+            // limited EEPROM life-time, only write to EEPROM if necessary
+            if (current != encryptedKey[i]) {
+                Serial.print(F("writing encrypted key to EEPROM["));
+                Serial.print(index);
+                Serial.println(F("]"));
+                EEPROM.write(index, encryptedKey[i]);
             }
-
-            // save the encrypted key
-            for (size_t i = 0; i < KEY_SIZE; i++) {
-                current = EEPROM.read(index);
-                // limited EEPROM life-time, only write to EEPROM if necessary
-                if (current != encryptedKey[i]) {
-                    Serial.print("writing encrypted key to EEPROM[");
-                    Serial.print(index);
-                    Serial.println("]");
-                    EEPROM.write(index, encryptedKey[i]);
-                }
-                index++;
-            }
+            index++;
         }
     }
 }
@@ -174,7 +190,7 @@ bool invalidKeyPair(
     const uint8_t publicKey[KEY_SIZE],
     const uint8_t privateKey[KEY_SIZE]
 ) {
-    Serial.println("signing the private key to validate...");
+    Serial.println(F("signing the private key to validate..."));
     uint8_t signature[SIG_SIZE];
     Ed25519::sign(signature, privateKey, publicKey, (const void*) privateKey, KEY_SIZE);
     return !Ed25519::verify(signature, publicKey, (const void*) privateKey, KEY_SIZE);
@@ -185,29 +201,29 @@ bool invalidKeyPair(
 
 HSM::HSM() {
     // allocate space for state
-    Serial.println("allocating space for the state...");
+    Serial.println(F("allocating space for the state..."));
     accountId = new uint8_t[AID_SIZE];
     publicKey = new uint8_t[KEY_SIZE];
     encryptedKey = new uint8_t[KEY_SIZE];
 
-    // load the state from persistent memory
-    Serial.println("loading the state from persistent memory...");
-    loadState(accountId, publicKey, encryptedKey);
-
-    // check to see if an accountId exists
-    for (size_t i = 0; i < AID_SIZE; i++) {
-        Serial.println("account already exists...");
-        if (accountId[i] != 0x00) return;  // accountId exists
+    // load the account Id from persistent memory
+    Serial.println(F("loading the account Id from persistent memory..."));
+    if (loadAccount(accountId)) {
+        Serial.println(F("loading the keys from persistent memory..."));
+        if (loadKeys(publicKey, encryptedKey)) {
+            Serial.println(F("everything loaded..."));
+            return;  // everything loaded
+        }
+        Serial.println(F("no keys..."));
+        erase(publicKey, KEY_SIZE);
+        publicKey = 0;
+        erase(encryptedKey, KEY_SIZE);
+        encryptedKey = 0;
+        return;  // account loaded
     }
-
-    // if no accountId, delete the state
-    Serial.println("account does not exist...");
+    Serial.println(F("account does not exist..."));
     erase(accountId, AID_SIZE);
     accountId = 0;
-    erase(publicKey, KEY_SIZE);
-    publicKey = 0;
-    erase(encryptedKey, KEY_SIZE);
-    encryptedKey = 0;
 }
 
 
@@ -228,27 +244,32 @@ HSM::~HSM() {
 void HSM::resetHSM() {
 
     // erase transient data
-    Serial.println("erasing transient data...");
+    Serial.println(F("erasing transient data..."));
+    Serial.println(F("erasing account Id..."));
     erase(accountId, AID_SIZE);
     accountId = 0;
+    Serial.println(F("erasing public key..."));
     erase(publicKey, KEY_SIZE);
     publicKey = 0;
+    Serial.println(F("erasing encrypted key..."));
     erase(encryptedKey, KEY_SIZE);
     encryptedKey = 0;
+    Serial.println(F("erasing previous public key..."));
     erase(previousPublicKey, KEY_SIZE);
     previousPublicKey = 0;
+    Serial.println(F("erasing previous encrypted key..."));
     erase(previousEncryptedKey, KEY_SIZE);
     previousEncryptedKey = 0;
 
-    Serial.println("erasing persistent data...");
+    Serial.println(F("erasing persistent data..."));
     // erase persistent data
     for (size_t i = 0; i < EEPROM.length(); i++) {
         uint8_t current = EEPROM.read(i);
         // limited EEPROM life-time, only write to EEPROM if necessary
         if (current != 0) {
-            Serial.print("writing zero to EEPROM[");
+            Serial.print(F("writing zero to EEPROM["));
             Serial.print(i);
-            Serial.println("]");
+            Serial.println(F("]"));
             EEPROM.write(i, 0x00);
         }
     }
@@ -257,13 +278,13 @@ void HSM::resetHSM() {
 
 bool HSM::registerAccount(const uint8_t anAccountId[KEY_SIZE]) {
     if (accountId) {
-        Serial.println("account is already registered...");
+        Serial.println(F("account is already registered..."));
         return false;  // already registered
     }
     accountId = new uint8_t[AID_SIZE];
     memcpy(accountId, anAccountId, AID_SIZE);
-    Serial.println("saving the account Id in persistent memory...");
-    saveState(accountId);
+    Serial.println(F("saving the account Id in persistent memory..."));
+    saveAccount(accountId);
     return true;
 }
 
@@ -274,13 +295,13 @@ const uint8_t* HSM::digestMessage(
     const char* message
 ) {
     if (invalidAccount(anAccountId, accountId)) {
-        Serial.println("invalid account Id...");
+        Serial.println(F("invalid account Id..."));
         return 0;
     }
     SHA512 digester;
     size_t messageLength = strlen(message);
     uint8_t* digest = new uint8_t[DIG_SIZE];
-    Serial.println("digesting the message...");
+    Serial.println(F("digesting the message..."));
     digester.update((const void*) message, messageLength);
     digester.finalize(digest, DIG_SIZE);
     return digest;
@@ -295,18 +316,18 @@ const uint8_t* HSM::generateKeys(
     uint8_t secretKey[KEY_SIZE]
 ) {
     if (invalidAccount(anAccountId, accountId)) {
-        Serial.println("invalid account Id...");
+        Serial.println(F("invalid account Id..."));
         return 0;
     }
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
 
     // handle any previous keys
     if (previousPublicKey) {
-        Serial.println("rolling back previous keys...");
+        Serial.println(F("rolling back previous keys..."));
         // roll-back the previous regeneration attempt
         memcpy(publicKey, previousPublicKey, KEY_SIZE);
         memcpy(encryptedKey, previousEncryptedKey, KEY_SIZE);
-        saveState(accountId, publicKey, encryptedKey);
+        saveKeys(publicKey, encryptedKey);
         erase(previousPublicKey, KEY_SIZE);
         previousPublicKey = 0;
         erase(previousEncryptedKey, KEY_SIZE);
@@ -315,11 +336,11 @@ const uint8_t* HSM::generateKeys(
 
     // handle existing keys
     if (secretKey) {
-        Serial.println("handling existing keys...");
+        Serial.println(F("handling existing keys..."));
         decryptKey(secretKey, encryptedKey, privateKey);
 
         // validate the private key
-        Serial.println("validating the private key...");
+        Serial.println(F("validating the private key..."));
         if (invalidKeyPair(publicKey, privateKey)) {
             // clean up and bail
             erase(privateKey, KEY_SIZE);
@@ -335,17 +356,17 @@ const uint8_t* HSM::generateKeys(
     }
 
     // generate a new key pair
-    Serial.println("generating the private key...");
+    Serial.println(F("generating the private key..."));
     Ed25519::generatePrivateKey(privateKey);
-    Serial.println("generating the public key...");
+    Serial.println(F("generating the public key..."));
     Ed25519::derivePublicKey(publicKey, privateKey);
 
     // encrypt and save the private key
-    Serial.println("encrypting and saving the keys...");
+    Serial.println(F("encrypting and saving the keys..."));
     encryptKey(newSecretKey, privateKey, encryptedKey);
     erase(privateKey, KEY_SIZE);
     privateKey = 0;
-    saveState(accountId, publicKey, encryptedKey);
+    saveKeys(publicKey, encryptedKey);
 
     // return a copy of the public key
     uint8_t* copy = new uint8_t[KEY_SIZE];
@@ -362,7 +383,7 @@ const uint8_t* HSM::signMessage(
     const char* message
 ) {
     if (invalidAccount(anAccountId, accountId)) {
-        Serial.println("invalid account Id...");
+        Serial.println(F("invalid account Id..."));
         return 0;
     }
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
@@ -372,13 +393,13 @@ const uint8_t* HSM::signMessage(
     const uint8_t* currentEncryptedKey = previousPublicKey ? previousEncryptedKey : encryptedKey;
 
     // decrypt the private key
-    Serial.println("decrypting the key...");
+    Serial.println(F("decrypting the key..."));
     decryptKey(secretKey, currentEncryptedKey, privateKey);
 
     // validate the private key
-    Serial.println("validating the key...");
+    Serial.println(F("validating the key..."));
     if (invalidKeyPair(currentPublicKey, privateKey)) {
-        Serial.println("the key is invalid...");
+        Serial.println(F("the key is invalid..."));
         // clean up and bail
         erase(privateKey, KEY_SIZE);
         privateKey = 0;
@@ -386,18 +407,18 @@ const uint8_t* HSM::signMessage(
     }
 
     // sign the message using the private key
-    Serial.println("signing the message...");
+    Serial.println(F("signing the message..."));
     uint8_t* signature = new uint8_t[SIG_SIZE];
     size_t messageLength = strlen(message);
     Ed25519::sign(signature, privateKey, currentPublicKey, (const void*) message, messageLength);
 
     // erase the private key
-    Serial.println("erasing the private key...");
+    Serial.println(F("erasing the private key..."));
     erase(privateKey, KEY_SIZE);
     privateKey = 0;
 
     // handle any previous key state
-    Serial.println("handling any previous keys...");
+    Serial.println(F("handling any previous keys..."));
     if (previousPublicKey) {
         erase(previousPublicKey, KEY_SIZE);
         previousPublicKey = 0;
@@ -420,10 +441,10 @@ bool HSM::validSignature(
     const uint8_t aPublicKey[KEY_SIZE]
 ) {
     if (invalidAccount(anAccountId, accountId)) {
-        Serial.println("invalid account Id...");
+        Serial.println(F("invalid account Id..."));
         return false;
     }
-    Serial.println("verifying the signature...");
+    Serial.println(F("verifying the signature..."));
     size_t messageLength = strlen(message);
     aPublicKey = aPublicKey ? aPublicKey : publicKey;  // default to the HSM public key
     bool isValid = Ed25519::verify(signature, aPublicKey, (const void*) message, messageLength);
@@ -434,7 +455,7 @@ bool HSM::validSignature(
 // INVARIANT: No trace of any keys will remain when this function returns.
 bool HSM::eraseKeys(const uint8_t anAccountId[AID_SIZE]) {
     if (invalidAccount(anAccountId, accountId)) {
-        Serial.println("invalid account Id...");
+        Serial.println(F("invalid account Id..."));
         return false;
     }
 
@@ -449,8 +470,9 @@ bool HSM::eraseKeys(const uint8_t anAccountId[AID_SIZE]) {
     previousEncryptedKey = 0;
 
     // erase the state of the EEPROM drive
-    Serial.println("erasing the state of the keys from persistent memory...");
-    saveState(accountId, publicKey, encryptedKey);
+    Serial.println(F("erasing the state of the keys from persistent memory..."));
+    saveAccount(accountId);
+    saveKeys(publicKey, encryptedKey);
 
     return true;
 }
