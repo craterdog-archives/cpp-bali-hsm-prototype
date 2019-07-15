@@ -3,7 +3,7 @@
  ************************************************************************/
 #include <string.h>
 #include <Arduino.h>
-#include <EEPROM.h>
+#include "EEPROM.h"  // change to <EEPROM.h> for real implemnetation
 #include "SHA512.h"  // change to <SHA512.h> for real implementation
 #include "Ed25519.h"  // change to <Ed25519.h> for real implementation
 #include "HSM.h"
@@ -64,15 +64,7 @@ void saveAccount(const uint8_t accountId[AID_SIZE]) {
 
     // save the account Id
     for (size_t i = 0; i < AID_SIZE; i++) {
-        current = EEPROM.read(index);
-        // limited EEPROM life-time, only write to EEPROM if necessary
-        if (current != accountId[i]) {
-            Serial.print(F("writing account Id to EEPROM["));
-            Serial.print(index);
-            Serial.println(F("]"));
-            EEPROM.write(index, accountId[i]);
-        }
-        index++;
+        EEPROM.update(index++, accountId[i]);
     }
 }
 
@@ -83,34 +75,18 @@ void saveAccount(const uint8_t accountId[AID_SIZE]) {
  */
 void saveKeys(const uint8_t publicKey[KEY_SIZE], const uint8_t encryptedKey[KEY_SIZE]) {
     uint8_t current;
-    size_t index = 0;
+    size_t index = AID_SIZE;
 
     if (publicKey) {
 
         // save the public key
         for (size_t i = 0; i < KEY_SIZE; i++) {
-            current = EEPROM.read(index);
-            // limited EEPROM life-time, only write to EEPROM if necessary
-            if (current != publicKey[i]) {
-                Serial.print(F("writing public key to EEPROM["));
-                Serial.print(index);
-                Serial.println(F("]"));
-                EEPROM.write(index, publicKey[i]);
-            }
-            index++;
+            EEPROM.update(index++, publicKey[i]);
         }
 
         // save the encrypted key
         for (size_t i = 0; i < KEY_SIZE; i++) {
-            current = EEPROM.read(index);
-            // limited EEPROM life-time, only write to EEPROM if necessary
-            if (current != encryptedKey[i]) {
-                Serial.print(F("writing encrypted key to EEPROM["));
-                Serial.print(index);
-                Serial.println(F("]"));
-                EEPROM.write(index, encryptedKey[i]);
-            }
-            index++;
+            EEPROM.update(index++, encryptedKey[i]);
         }
     }
 }
@@ -268,14 +244,7 @@ void HSM::resetHSM() {
     Serial.println(F("erasing persistent data..."));
     // erase persistent data
     for (size_t i = 0; i < EEPROM.length(); i++) {
-        uint8_t current = EEPROM.read(i);
-        // limited EEPROM life-time, only write to EEPROM if necessary
-        if (current != 0) {
-            Serial.print(F("writing zero to EEPROM["));
-            Serial.print(i);
-            Serial.println(F("]"));
-            EEPROM.write(i, 0x00);
-        }
+        EEPROM.update(i, 0x00);
     }
 }
 
