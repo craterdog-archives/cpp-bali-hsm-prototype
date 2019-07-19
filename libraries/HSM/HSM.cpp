@@ -3,9 +3,9 @@
  ************************************************************************/
 #include <string.h>
 #include <Arduino.h>
+#include <SHA512.h>
+#include <Ed25519.h>
 #include "EEPROM.h"  // change to <EEPROM.h> for real implemnetation
-#include "SHA512.h"  // change to <SHA512.h> for real implementation
-#include "Ed25519.h"  // change to <Ed25519.h> for real implementation
 #include "HSM.h"
 
 
