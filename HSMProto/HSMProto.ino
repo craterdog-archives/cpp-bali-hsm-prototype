@@ -1,32 +1,33 @@
-#include <Arduino.h>
-#include <SPI.h>
-#include <Adafruit_BLE.h>
-#include <Adafruit_BluefruitLE_SPI.h>
-#include <Adafruit_BluefruitLE_UART.h>
-#include "Config.h"
+#include <bluefruit.h>
+//#include "Config.h"  //not used
 #include <Codex.h>
-#include <Formatter.h>
 #include <HSM.h>
 
-// Create the bluefruit hardware SPI, using SCK/MOSI/MISO hardware SPI pins,
-// and then user selected CS/IRQ/RST
-Adafruit_BluefruitLE_SPI bluetooth(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
+BLEDis  bledis;  // device information service
+BLEUart bleuart; // UART communication service
 
 
 // Forward declarations
-HSM* hsm;
-
-int32_t readRequest(void);
-uint8_t** readArguments(void);
-void deleteArguments(uint8_t**);
-void writeResult(uint8_t* result, size_t length = 0);
-void eraseKey(uint8_t* key);
+uint8_t readRequest(void);
+void writeResult(bool result);
+void writeResult(uint8_t* result, size_t length);
 void testHSM(void);
+
+struct Argument {
+    uint8_t* pointer;
+    size_t length;
+};
+
+const int BUFFER_SIZE = 2000;
+uint8_t buffer[BUFFER_SIZE];
+Argument* arguments = 0;
+
+HSM* hsm;
 
 
 /*
- * This function configures the HW an the BLE module. It is called
- * automatically on startup.
+ * This function configures the adafruit feather. It is called automatically
+ * on startup.
  */
 void setup(void) {
     initConsole();
@@ -36,143 +37,16 @@ void setup(void) {
 
 
 /*
- * This function polls the BLE (bluetooth) hardware for new requests. It
- * is called automatically after setup().
+ * This function is called repeatedly once the adafruit feather has been setup.
  */
 void loop(void) {
-    
-    // Check for incoming characters from Bluefruit
-    if (bluetooth.available()) {
-
-        // signal an incoming request
-        digitalWrite(LED_BUILTIN, HIGH);  // turn the LED on (HIGH is the voltage level)
-        digitalWrite(LED_BUILTIN, LOW);   // turn the LED off by making the voltage LOW
-
-        // read the next request
-        int32_t request = readRequest();
-        Serial.print(F("Request: "));
-        uint8_t** arguments = readArguments();
-
-        switch (request) {
-            // registerAccount
-            case 1: {
-                Serial.println(F("Register Account"));
-                const uint8_t* anAccountId = arguments[0];
-                boolean success = hsm->registerAccount(anAccountId);
-                writeResult(success);
-                Serial.println(success ? "Succeeded" : "Failed");
-                Serial.println(F(""));
-                deleteArguments(arguments);
-                break;
-            }
-
-            // digestMessage
-            case 2: {
-                Serial.println(F("Digest Message"));
-                const uint8_t* anAccountId = arguments[0];
-                const char* message = (const char*) arguments[1];
-                const uint8_t* digest = hsm->digestMessage(anAccountId, message);
-                writeResult(digest, sizeof digest);
-                Serial.println(digest ? "Succeeded" : "Failed");
-                Serial.println(F(""));
-                deleteArguments(arguments);
-                delete [] digest;
-                break;
-            }
-
-            // generateKeys
-            case 3: {
-                Serial.println(F("(Re)Generate Keys"));
-                const uint8_t* anAccountId = arguments[0];
-                uint8_t* newSecretKey = arguments[1];
-                uint8_t* secretKey = (sizeof arguments == 3) ? arguments[2] : 0;
-                const uint8_t* publicKey = hsm->generateKeys(anAccountId, newSecretKey, secretKey);
-                eraseKey(newSecretKey);
-                newSecretKey = 0;
-                eraseKey(secretKey);
-                secretKey = 0;
-                writeResult(publicKey, sizeof publicKey);
-                Serial.println(publicKey ? "Succeeded" : "Failed");
-                Serial.println(F(""));
-                deleteArguments(arguments);
-                delete [] publicKey;
-                break;
-            }
- 
-            // signMessage
-            case 4: {
-                Serial.println(F("Sign Message"));
-                const uint8_t* anAccountId = arguments[0];
-                uint8_t* secretKey = arguments[1];
-                const char* message = (const char*) arguments[2];
-                const uint8_t* signature = hsm->signMessage(anAccountId, secretKey, message);
-                eraseKey(secretKey);
-                secretKey = 0;
-                writeResult(signature, sizeof signature);
-                Serial.println(signature ? "Succeeded" : "Failed");
-                Serial.println(F(""));
-                deleteArguments(arguments);
-                delete [] signature;
-                break;
-            }
- 
-            // validSignature
-            case 5: {
-                Serial.println(F("Valid Signature?"));
-                const uint8_t* anAccountId = arguments[0];
-                const char* message = (const char*) arguments[1];
-                const uint8_t* signature = arguments[2];
-                const uint8_t* aPublicKey = (sizeof arguments == 4) ? arguments[3] : 0;
-                bool isValid = hsm->validSignature(anAccountId, message, signature, aPublicKey);
-                writeResult((const uint8_t*) isValid);
-                Serial.println(isValid ? "Succeeded" : "Failed");
-                Serial.println(F(""));
-                deleteArguments(arguments);
-                break;
-            }
- 
-            // eraseKeys
-            case 6: {
-                Serial.println(F("Erase Keys"));
-                const uint8_t* anAccountId = arguments[0];
-                bool isValid = hsm->eraseKeys(anAccountId);
-                writeResult((const uint8_t*) isValid);
-                Serial.println(isValid ? "Succeeded" : "Failed");
-                Serial.println(F(""));
-                deleteArguments(arguments);
-                break;
-            }
-
-            // testHSM
-            case 42: {
-                Serial.println(F("Test HSM"));
-                testHSM(arguments);
-                deleteArguments(arguments);
-                break;
-            }
-
-            // invalid
-            default: {
-                Serial.println(F("Invalid, try again..."));
-                Serial.println(F(""));
-                break;
-            }
-        }
-
-    }
-
+    // Everything is handled by event callbacks
 }
 
 
 void initConsole() {
-    // initialize the LED
-    pinMode(LED_BUILTIN, OUTPUT);
-
-    // initialize the logging console
-    while (!Serial) delay(500);
     Serial.begin(115200);
-
-    // logging console header
+    while (!Serial) delay(10);
     Serial.println(F("Wearable Identity Console"));
     Serial.println(F("-------------------------"));
     Serial.println(F(""));
@@ -190,44 +64,241 @@ void initHSM() {
 void initBluetooth() {
     Serial.println(F("Initializing the bluetooth module..."));
 
-    // Set the bluetooth logging to verbose
-    if (!bluetooth.begin(VERBOSE_MODE)) {
-        Serial.println(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
-    }
+    // Setup the BLE LED to be enabled on CONNECT.
+    Bluefruit.autoConnLed(true);
 
-    // Perform a factory reset to make sure everything is in a known state
-    if (FACTORY_RESET_ENABLE && !bluetooth.factoryReset()) {
-        Serial.println(F("Unable to perform a factory reset."));
-    }
+    // Config the peripheral connection
+    // Note: Maximum bandwith requires more SRAM.
+    Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
 
-    // Disable the command echo for bluetooth
-    bluetooth.echo(false);
-    
+    Bluefruit.begin();
+
     // Limit the range for connections for better security
     // Allowed values: -40, -20, -16, -12, -8, -4, 0, and 4
-    bluetooth.sendCommandCheckOK("AT+BLEPOWERLEVEL=-40");
-    
-    // Print Bluefruit information
-    bluetooth.info();
-    
-    // Debug info is a little annoying after this point!
-    bluetooth.verbose(false);
+    //Bluefruit.setTxPower(-40);
+    Bluefruit.setTxPower(-4);
+
+    // The name will be displayed in the mobile app
+    Bluefruit.setName("ButtonUp™");
+
+    // Add callbacks for important events
+    Bluefruit.Periph.setConnectCallback(connectCallback);
+    Bluefruit.Periph.setDisconnectCallback(disconnectCallback);
+
+    // Configure and start the Device Information Service
+    bledis.setManufacturer("Adafruit Industries");
+    bledis.setModel("Bluefruit Feather52");
+    bledis.begin();
+  
+    // Configure and start UART Communication Service
+    bleuart.begin();
+    bleuart.setRxCallback(readCallback);
+
+    // Configure and start advertising for the device
+    Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+    Bluefruit.Advertising.addTxPower();              // uses the current BLE power level
+    Bluefruit.Advertising.addService(bleuart);
+    Bluefruit.ScanResponse.addName();                // uses the device name specified above
+    Bluefruit.Advertising.restartOnDisconnect(true); // auto advertising when disconnected
+    Bluefruit.Advertising.setInterval(32, 244);      // fast mode and slow mode (in units of 0.625 ms)
+    Bluefruit.Advertising.setFastTimeout(30);        // timeout in seconds for fast mode, then slow mode
+    Bluefruit.Advertising.start(0);                  // 0 = Don't stop advertising after N seconds  
 
     Serial.println(F("Done."));
     Serial.println(F(""));
+}
 
-    Serial.println(F("Waiting for a connection..."));
-    // Wait for connection
-    while (!bluetooth.isConnected()) delay(500);
 
-    // Set LED activity mode
-    bluetooth.sendCommandCheckOK(F("AT+HWModeLED=DISABLE"));
+/**
+ * This function is invoked each time a connection to the device occurs.
+ */
+void connectCallback(uint16_t connectionHandle) {
+    BLEConnection* connection = Bluefruit.Connection(connectionHandle);
+    char peerName[32] = { 0 };
+    connection->getPeerName(peerName, sizeof(peerName));
+    Serial.print("Connected to ");
+    Serial.println(peerName);
+    Serial.println("");
+}
 
-    // Switch to data mode
-    bluetooth.setMode(BLUEFRUIT_MODE_DATA);
-    
-    Serial.println(F("Connected."));
-    Serial.println(F(""));
+
+/**
+ * This function is invoked each time data can be read from the UART.
+ */
+void readCallback(uint16_t connectionHandle) {
+
+    // Check for incoming request from mobile device
+    if (bleuart.available()) {
+
+        // read the next request
+        uint8_t request = readRequest();
+        Serial.print(F("Request: "));
+
+        switch (request) {
+            // registerAccount
+            case 1: {
+                Serial.println(F("Register Account"));
+                boolean success = false;
+                const uint8_t* anAccountId = arguments[0].pointer;
+                if (arguments[0].length == AID_SIZE) {
+                    success = hsm->registerAccount(anAccountId);
+                }
+                writeResult(success);
+                Serial.println(success ? "Succeeded" : "Failed");
+                Serial.println(F(""));
+                break;
+            }
+
+            // digestMessage
+            case 2: {
+                Serial.println(F("Digest Message"));
+                boolean success = false;
+                const uint8_t* anAccountId = arguments[0].pointer;
+                if (arguments[0].length == AID_SIZE) {
+                    const char* message = (const char*) arguments[1].pointer;
+                    if (arguments[1].length == strlen(message) + 1) {
+                        const uint8_t* digest = hsm->digestMessage(anAccountId, message);
+                        if (digest) {
+                            success = true;
+                            writeResult(digest, sizeof digest);
+                            delete [] digest;
+                        }
+                    }
+                }
+                if (!success) writeResult(false);
+                Serial.println(success ? "Succeeded" : "Failed");
+                Serial.println(F(""));
+                break;
+            }
+
+            // generateKeys
+            case 3: {
+                Serial.println(F("(Re)Generate Keys"));
+                boolean success = false;
+                const uint8_t* anAccountId = arguments[0].pointer;
+                if (arguments[0].length == AID_SIZE) {
+                    uint8_t* newSecretKey = arguments[1].pointer;
+                    if (arguments[1].length == KEY_SIZE) {
+                        const uint8_t* publicKey;
+                        if (sizeof arguments == 3) {
+                            uint8_t* secretKey = arguments[2].pointer;
+                            if (arguments[2].length == KEY_SIZE) {
+                                publicKey = hsm->generateKeys(anAccountId, newSecretKey, secretKey);
+                            }
+                            memset(secretKey, 0x00, KEY_SIZE);
+                        } else {
+                            publicKey = hsm->generateKeys(anAccountId, newSecretKey);
+                        }
+                        if (publicKey) {
+                            success = true;
+                            writeResult(publicKey, sizeof publicKey);
+                            delete [] publicKey;
+                        }
+                    }
+                    memset(newSecretKey, 0x00, KEY_SIZE);
+                }
+                if (!success) writeResult(false);
+                Serial.println(success ? "Succeeded" : "Failed");
+                Serial.println(F(""));
+                break;
+            }
+ 
+            // signMessage
+            case 4: {
+                Serial.println(F("Sign Message"));
+                boolean success = false;
+                const uint8_t* anAccountId = arguments[0].pointer;
+                if (arguments[0].length == AID_SIZE) {
+                    uint8_t* secretKey = arguments[1].pointer;
+                    if (arguments[1].length == KEY_SIZE) {
+                        const char* message = (const char*) arguments[2].pointer;
+                        if (arguments[2].length == strlen(message) + 1) {
+                            const uint8_t* signature = hsm->signMessage(anAccountId, secretKey, message);
+                            if (signature) {
+                                success = true;
+                                writeResult(signature, sizeof signature);
+                                delete [] signature;
+                            }
+                        }
+                    }
+                    memset(secretKey, 0x00, KEY_SIZE);
+                }
+                if (!success) writeResult(false);
+                Serial.println(success ? "Succeeded" : "Failed");
+                Serial.println(F(""));
+                break;
+            }
+ 
+            // validSignature
+            case 5: {
+                Serial.println(F("Valid Signature?"));
+                boolean success = false;
+                const uint8_t* anAccountId = arguments[0].pointer;
+                if (arguments[0].length == AID_SIZE) {
+                    const char* message = (const char*) arguments[1].pointer;
+                    if (arguments[1].length == strlen(message) + 1) {
+                        uint8_t* signature = arguments[2].pointer;
+                        if (arguments[2].length == SIG_SIZE) {
+                            if (sizeof arguments == 4) {
+                                uint8_t* aPublicKey = arguments[3].pointer;
+                                if (arguments[3].length == KEY_SIZE) {
+                                    success = hsm->validSignature(anAccountId, message, signature, aPublicKey);
+                                }
+                            } else {
+                                success = hsm->validSignature(anAccountId, message, signature);
+                            }
+                        }
+                    }
+                }
+                if (!success) writeResult(false);
+                Serial.println(success ? "Succeeded" : "Failed");
+                Serial.println(F(""));
+                break;
+            }
+ 
+            // eraseKeys
+            case 6: {
+                Serial.println(F("Erase Keys"));
+                boolean success = false;
+                const uint8_t* anAccountId = arguments[0].pointer;
+                if (arguments[0].length == AID_SIZE) {
+                    success = hsm->eraseKeys(anAccountId);
+                }
+                writeResult(success);
+                Serial.println(success ? "Succeeded" : "Failed");
+                Serial.println(F(""));
+                break;
+            }
+
+            // testHSM
+            case 42: {
+                Serial.println(F("Test HSM"));
+                testHSM();
+                break;
+            }
+
+            // invalid
+            default: {
+                Serial.print(request);
+                Serial.println(F(" - Invalid request, try again..."));
+                Serial.println(F(""));
+                break;
+            }
+        }
+
+    }
+
+}
+
+
+/**
+ * This function is invoked each time a connection to the device is lost.
+ */
+void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
+    Serial.print("Disconnected from mobile device - reason code: 0x");
+    Serial.println(reason, HEX);
+    Serial.println("See: ~/Library/Arduino15/packages/adafruit/hardware/nrf52/0.11.1/cores/nRF5/nordic/softdevice/s140_nrf52_6.1.1_API/include/ble_hci.h");
+    Serial.println("");
 }
 
 
@@ -240,73 +311,40 @@ uint8_t* randomBytes(size_t length) {
 }
 
 
-int32_t readRequest(void) {
-    int32_t request = bluetooth.readline_parseInt();
-    if ((request < 1 || request > 6) && request != 42) return 0;
+uint8_t readRequest() {
+    size_t count = bleuart.read(buffer, BUFFER_SIZE);
+    if (count == 0 || count == BUFFER_SIZE) {
+        // invalid request
+        return 0;
+    }
+    size_t index = 0;
+    uint8_t request = buffer[index++];
+    if (request == 42) count = 1;
+    uint8_t numberOfArguments = (count > 1) ? buffer[index++] : 0;
+    if (arguments) delete [] arguments;
+    arguments = new Argument[numberOfArguments];
+    for (size_t i = 0; i < numberOfArguments; i++) {
+        uint16_t numberOfBytes = buffer[index++] << 8 | buffer[index++];
+        arguments[i].pointer = buffer + index;
+        arguments[i].length = numberOfBytes;
+        index += numberOfBytes;
+    }
+    if (index != count) return 0;  // invalid request format
     return request;
 }
 
 
-uint8_t** readArguments(void) {
-    int32_t count = bluetooth.readline_parseInt();
-    uint8_t** arguments = new uint8_t*[count];
-    for (size_t i = 0; i < count; i++) {
-        int32_t length = bluetooth.readline_parseInt();
-        uint8_t* argument = new uint8_t[length];
-        for (size_t j = 0; j < length; j++) {
-            size_t timeout = 5;  // seconds
-            while (!bluetooth.available()) {
-                if (timeout--) {
-                    delay(1);  // wait a second
-                } else {
-                    // timed out so clean up and bail
-                    for (size_t k = 0; k < i; k++) {
-                        delete [] arguments[k];  // the arguments read in thus far
-                    }
-                    delete [] argument;  // the argument in progress
-                    delete [] arguments;  // the array of arguments
-                    return 0;
-                }
-            }
-            argument[j] = bluetooth.read();
-        }
-        arguments[i] = argument;
-    }
-    return arguments;
-}
-
-
-void deleteArguments(uint8_t** arguments) {
-    size_t count = sizeof arguments;
-    for (size_t i = 0; i < count; i++) {
-        uint8_t* argument = arguments[i];
-        delete [] argument;
-    }
-    delete [] arguments;
-}
-
-
 void writeResult(bool result) {
-    bluetooth.write((int) result);
+    bleuart.write((uint8_t) result);
 }
 
 
 void writeResult(const uint8_t* result, size_t length) {
-    for (size_t i = 0; i < length; i++) {
-        bluetooth.write(result[i]);
-    }
+    bleuart.write(result, length);
 }
 
 
-void eraseKey(uint8_t* key) {
-    if (key) {
-        memset(key, 0x00, KEY_SIZE);
-        delete [] key;
-    }
-}
-
-
-void testHSM(uint8_t** arguments) {
+void testHSM() {
     Serial.println(F("Resetting the HSM..."));
     hsm->resetHSM();
     Serial.println(F("Done."));
