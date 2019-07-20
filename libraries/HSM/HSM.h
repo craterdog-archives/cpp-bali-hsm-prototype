@@ -187,11 +187,11 @@ class HSM final {
     bool eraseKeys(const uint8_t anAccountId[AID_SIZE]);
 
   private:
-    uint8_t* accountId;
-    uint8_t* publicKey;
-    uint8_t* encryptedKey;
-    uint8_t* previousPublicKey;
-    uint8_t* previousEncryptedKey;
+    uint8_t* accountId = 0;
+    uint8_t* publicKey = 0;
+    uint8_t* encryptedKey = 0;
+    uint8_t* previousPublicKey = 0;
+    uint8_t* previousEncryptedKey = 0;
 
 };
 

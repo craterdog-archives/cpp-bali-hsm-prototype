@@ -50,6 +50,9 @@
 #define RNG_ESP_NVS 1
 #include <nvs.h>
 #endif
+// ADDED for SparkFun nRF52 boards
+#define RNG_WORD_TRNG 1
+#define RNG_WORD_TRNG_GET() *((volatile uint32_t *)(0x4000D000))
 #include <string.h>
 
 // Throw a warning if there is no built-in hardware random number source.

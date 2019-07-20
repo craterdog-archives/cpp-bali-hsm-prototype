@@ -6,88 +6,11 @@
 #include <SHA512.h>
 #include <Ed25519.h>
 #include "EEPROM.h"  // change to <EEPROM.h> for real implemnetation
+#include "Codex.h"
 #include "HSM.h"
 
 
 // PRIVATE FREE FUNCTIONS
-
-/**
- * This function loads the saved account Id from the EEPROM drive.
- */
-bool loadAccount(uint8_t accountId[AID_SIZE]) {
-    size_t index = 0;
-    bool accountExists = false;
-
-    // load the account Id
-    for (size_t i = 0; i < AID_SIZE; i++) {
-        accountId[i] = EEPROM.read(index++);
-        if (accountId[i] != 0x00) accountExists = true;
-    }
-
-    return accountExists;
-}
-
-
-/**
- * This function loads the saved keys from the EEPROM drive.
- */
-bool loadKeys(uint8_t publicKey[KEY_SIZE], uint8_t encryptedKey[KEY_SIZE]) {
-    size_t index = AID_SIZE;
-    bool keysExist = false;
-
-    // load the public key
-    for (size_t i = 0; i < KEY_SIZE; i++) {
-        publicKey[i] = EEPROM.read(index++);
-        if (publicKey[i] != 0x00) keysExist = true;
-    }
-
-    if (keysExist) {
-        // load the encrypted key
-        for (size_t i = 0; i < KEY_SIZE; i++) {
-            encryptedKey[i] = EEPROM.read(index++);
-        }
-    }
-
-    return keysExist;
-}
-
-
-/**
- * This function saves the account Id to the EEPROM drive.
- */
-void saveAccount(const uint8_t accountId[AID_SIZE]) {
-    uint8_t current;
-    size_t index = 0;
-
-    // save the account Id
-    for (size_t i = 0; i < AID_SIZE; i++) {
-        EEPROM.update(index++, accountId[i]);
-    }
-}
-
-
-/**
- * This function saves the current state of the hardware security module (HSM)
- * to the EEPROM drive.
- */
-void saveKeys(const uint8_t publicKey[KEY_SIZE], const uint8_t encryptedKey[KEY_SIZE]) {
-    uint8_t current;
-    size_t index = AID_SIZE;
-
-    if (publicKey) {
-
-        // save the public key
-        for (size_t i = 0; i < KEY_SIZE; i++) {
-            EEPROM.update(index++, publicKey[i]);
-        }
-
-        // save the encrypted key
-        for (size_t i = 0; i < KEY_SIZE; i++) {
-            EEPROM.update(index++, encryptedKey[i]);
-        }
-    }
-}
-
 
 /**
  * This function performs the exclusive or (XOR) operation on each byte in the
@@ -109,37 +32,12 @@ void XOR(
  * This function erases the specified data array and deletes its allocated
  * memory.
  */
-void erase(uint8_t* data, size_t size) {
+void erase(uint8_t* &data, size_t size) {
     if (data) {
         memset(data, 0x00, size);
         delete [] data;
+        data = 0;
     }
-}
-
-
-/**
- * This function uses a simple one-time-pad algorithm (XOR) to encrypt a private
- * key using a secret key and then erases both the secret key and private key.
- */
-void encryptKey(
-    const uint8_t secretKey[KEY_SIZE],
-    const uint8_t privateKey[KEY_SIZE],
-    uint8_t encryptedKey[KEY_SIZE]
-) {
-    XOR(secretKey, privateKey, encryptedKey);
-}
-
-
-/**
- * This function decrypts a private key that was encrypted using a secret key and
- * a simple one-time-pad algorithm (XOR) and then erases the secret key.
- */
-void decryptKey(
-    const uint8_t secretKey[KEY_SIZE],
-    const uint8_t encryptedKey[KEY_SIZE],
-    uint8_t privateKey[KEY_SIZE]
-) {
-    XOR(secretKey, encryptedKey, privateKey);
 }
 
 
@@ -172,65 +70,20 @@ bool invalidKeyPair(
 // PUBLIC MEMBER FUNCTIONS
 
 HSM::HSM() {
-    // allocate space for state
-    accountId = new uint8_t[AID_SIZE];
-    publicKey = new uint8_t[KEY_SIZE];
-    encryptedKey = new uint8_t[KEY_SIZE];
-    previousPublicKey = 0;
-    previousEncryptedKey = 0;
-
-    // load the account Id from persistent memory
-    if (loadAccount(accountId)) {
-        if (loadKeys(publicKey, encryptedKey)) {
-            return;  // everything loaded
-        }
-        erase(publicKey, KEY_SIZE);
-        publicKey = 0;
-        erase(encryptedKey, KEY_SIZE);
-        encryptedKey = 0;
-        return;  // account loaded
-    }
-    erase(accountId, AID_SIZE);
-    accountId = 0;
-    erase(publicKey, KEY_SIZE);
-    publicKey = 0;
-    erase(encryptedKey, KEY_SIZE);
-    encryptedKey = 0;
 }
 
 
 HSM::~HSM() {
-    erase(accountId, AID_SIZE);
-    accountId = 0;
-    erase(publicKey, KEY_SIZE);
-    publicKey = 0;
-    erase(encryptedKey, KEY_SIZE);
-    encryptedKey = 0;
-    erase(previousPublicKey, KEY_SIZE);
-    previousPublicKey = 0;
-    erase(previousEncryptedKey, KEY_SIZE);
-    previousEncryptedKey = 0;
+    resetHSM();
 }
 
 
 void HSM::resetHSM() {
-
-    // erase transient data
     erase(accountId, AID_SIZE);
-    accountId = 0;
     erase(publicKey, KEY_SIZE);
-    publicKey = 0;
     erase(encryptedKey, KEY_SIZE);
-    encryptedKey = 0;
     erase(previousPublicKey, KEY_SIZE);
-    previousPublicKey = 0;
     erase(previousEncryptedKey, KEY_SIZE);
-    previousEncryptedKey = 0;
-
-    // erase persistent data
-    for (size_t i = 0; i < EEPROM.length(); i++) {
-        EEPROM.update(i, 0x00);
-    }
 }
 
 
@@ -240,7 +93,6 @@ bool HSM::registerAccount(const uint8_t anAccountId[AID_SIZE]) {
     }
     accountId = new uint8_t[AID_SIZE];
     memcpy(accountId, anAccountId, AID_SIZE);
-    saveAccount(accountId);
     return true;
 }
 
@@ -262,57 +114,63 @@ const uint8_t* HSM::digestMessage(
 }
 
 
+// There are three possible states that the HSM can be in when this is
+// called:
+//  1) No keys yet exist, it is being called for the first time.
+//  2) A key pair exists and it is being called to rotate the keys.
+//  3) The previous key pair is stored and for some reason the subsequent
+//     call to signMessage() never occurred so we must roll back the keys.
 // NOTE: The returned public key must be deleted by the calling program.
 const uint8_t* HSM::generateKeys(
     const uint8_t anAccountId[AID_SIZE],
     uint8_t newSecretKey[KEY_SIZE],
-    uint8_t secretKey[KEY_SIZE]
+    uint8_t existingSecretKey[KEY_SIZE]
 ) {
     if (invalidAccount(anAccountId, accountId)) {
         return 0;
     }
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
 
-    // handle any previous keys
+    // handle any previous keys (case 3 above)
     if (previousPublicKey) {
         // roll-back the previous regeneration attempt
         memcpy(publicKey, previousPublicKey, KEY_SIZE);
         memcpy(encryptedKey, previousEncryptedKey, KEY_SIZE);
-        saveKeys(publicKey, encryptedKey);
         erase(previousPublicKey, KEY_SIZE);
-        previousPublicKey = 0;
         erase(previousEncryptedKey, KEY_SIZE);
-        previousEncryptedKey = 0;
+        // now we are back to case 2 above
     }
 
-    // handle existing keys
-    if (secretKey) {
-        decryptKey(secretKey, encryptedKey, privateKey);
+    // handle existing keys (case 2 above)
+    if (existingSecretKey) {
+        XOR(existingSecretKey, encryptedKey, privateKey);
 
         // validate the private key
         if (invalidKeyPair(publicKey, privateKey)) {
             // clean up and bail
             erase(privateKey, KEY_SIZE);
-            privateKey = 0;
             return 0;  // TODO: analyze as possible side channel
         }
 
         // save copies of the previous public and encrypted keys
         previousPublicKey = new uint8_t[KEY_SIZE];
         memcpy(previousPublicKey, publicKey, KEY_SIZE);
+        erase(publicKey, KEY_SIZE);
         previousEncryptedKey = new uint8_t[KEY_SIZE];
         memcpy(previousEncryptedKey, encryptedKey, KEY_SIZE);
+        erase(encryptedKey, KEY_SIZE);
+        // now we are in case 1 above
     }
 
-    // generate a new key pair
+    // generate a new key pair (case 1 above)
+    publicKey = new uint8_t[KEY_SIZE];
+    encryptedKey = new uint8_t[KEY_SIZE];
     Ed25519::generatePrivateKey(privateKey);
     Ed25519::derivePublicKey(publicKey, privateKey);
 
     // encrypt and save the private key
-    encryptKey(newSecretKey, privateKey, encryptedKey);
+    XOR(newSecretKey, privateKey, encryptedKey);
     erase(privateKey, KEY_SIZE);
-    privateKey = 0;
-    saveKeys(publicKey, encryptedKey);
 
     // return a copy of the public key
     uint8_t* copy = new uint8_t[KEY_SIZE];
@@ -327,7 +185,7 @@ const uint8_t* HSM::signMessage(
     uint8_t secretKey[KEY_SIZE],
     const char* message
 ) {
-    if (invalidAccount(anAccountId, accountId)) {
+    if (publicKey == 0 || invalidAccount(anAccountId, accountId)) {
         return 0;
     }
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
@@ -337,13 +195,12 @@ const uint8_t* HSM::signMessage(
     const uint8_t* currentEncryptedKey = previousPublicKey ? previousEncryptedKey : encryptedKey;
 
     // decrypt the private key
-    decryptKey(secretKey, currentEncryptedKey, privateKey);
+    XOR(secretKey, currentEncryptedKey, privateKey);
 
     // validate the private key
     if (invalidKeyPair(currentPublicKey, privateKey)) {
         // clean up and bail
         erase(privateKey, KEY_SIZE);
-        privateKey = 0;
         return 0;  // TODO: analyze as possible side channel
     }
 
@@ -354,14 +211,11 @@ const uint8_t* HSM::signMessage(
 
     // erase the private key
     erase(privateKey, KEY_SIZE);
-    privateKey = 0;
 
     // handle any previous key state
     if (previousPublicKey) {
         erase(previousPublicKey, KEY_SIZE);
-        previousPublicKey = 0;
         erase(previousEncryptedKey, KEY_SIZE);
-        previousEncryptedKey = 0;
     }
 
     // return the message signature
@@ -392,21 +246,10 @@ bool HSM::eraseKeys(const uint8_t anAccountId[AID_SIZE]) {
     if (invalidAccount(anAccountId, accountId)) {
         return false;
     }
-
-    // erase all keys in memory
     erase(publicKey, KEY_SIZE);
-    publicKey = 0;
     erase(encryptedKey, KEY_SIZE);
-    encryptedKey = 0;
     erase(previousPublicKey, KEY_SIZE);
-    previousPublicKey = 0;
     erase(previousEncryptedKey, KEY_SIZE);
-    previousEncryptedKey = 0;
-
-    // erase the state of the EEPROM drive
-    saveAccount(accountId);
-    saveKeys(publicKey, encryptedKey);
-
     return true;
 }
 
