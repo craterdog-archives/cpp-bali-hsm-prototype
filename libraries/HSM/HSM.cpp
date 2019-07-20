@@ -5,8 +5,6 @@
 #include <Arduino.h>
 #include <SHA512.h>
 #include <Ed25519.h>
-#include "EEPROM.h"  // change to <EEPROM.h> for real implemnetation
-#include "Codex.h"
 #include "HSM.h"
 
 

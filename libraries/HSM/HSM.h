@@ -79,8 +79,7 @@ class HSM final {
 
   public:
     /**
-     * This constructor "rehydrates" a hardware security module (HSM) on power up. It
-     * loads the keys from the EEPROM drive and begins processing requests.
+     * This constructor "rehydrates" a hardware security module (HSM) on power up.
      */
     HSM();
 
@@ -177,12 +176,11 @@ class HSM final {
     );
 
     /**
-     * This function erases from the processor memory all current and past keys and
-     * erases from the EEPROM drive the current keys. The specified account Id must
-     * match the account Id stored on the HSM or nothing is erased. This function
-     * should be called when the mobile device associated with the HSM has been lost
-     * or stolen. The function returns a value describing whether or not the keys
-     * were erased.
+     * This function erases from the processor memory all current and past keys.
+     * The specified account Id must match the account Id stored on the HSM or nothing
+     * is erased. This function should be called when the mobile device associated with
+     * the HSM has been lost or stolen. The function returns a value describing whether
+     * or not the keys were erased.
      */
     bool eraseKeys(const uint8_t anAccountId[AID_SIZE]);
 
