@@ -10,7 +10,7 @@
 
 // PRIVATE FREE FUNCTIONS
 
-/**
+/*
  * This function performs the exclusive or (XOR) operation on each byte in the
  * first two data arrays and places the resulting byte in the third data array.
  *   c = a xor b
@@ -26,9 +26,11 @@ void XOR(
 }
 
 
-/**
+/*
  * This function erases the specified data array and deletes its allocated
  * memory.
+ * NOTE: the data argument is passed by reference so that it can be reset
+ * to zero.
  */
 void erase(uint8_t* &data, size_t size) {
     if (data) {
@@ -39,7 +41,7 @@ void erase(uint8_t* &data, size_t size) {
 }
 
 
-/**
+/*
  * This function returns whether or not the specified account Id is invalid.
  */
 bool invalidAccount(
@@ -51,7 +53,7 @@ bool invalidAccount(
 }
 
 
-/**
+/*
  * This function returns whether or not the specified public-private key pair is
  * invalid.
  */

@@ -1,27 +1,58 @@
 #include <bluefruit.h>
-//#include "Config.h"  //not used
 #include <Codex.h>
 #include <HSM.h>
 
-BLEDis  bledis;  // device information service
-BLEUart bleuart; // UART communication service
 
-
-// Forward declarations
+// Forward Declarations
 uint8_t readRequest(void);
 void writeResult(bool result);
 void writeResult(uint8_t* result, size_t length);
 void testHSM(void);
 
+
+// Bluetooth Services
+BLEDis  bledis;  // device information service
+BLEUart bleuart; // UART communication service
+
+
+/*
+ * This structure is used to reference the section of the request buffer that
+ * contains a specific argument that was passed as part of the request. Each
+ * request has the following byte format:
+ *   Request (1 byte) [0..255]
+ *   Number of Arguments (1 byte) [0..255]
+ *   Length of Argument 1 (2 bytes) [0..65535]
+ *   Argument 1 ([0..65535] bytes)
+ *   Length of Argument 2 (2 bytes) [0..65535]
+ *   Argument 2 ([0..65535] bytes)
+ *      ...
+ *   Length of Argument N (2 bytes) [0..65535]
+ *   Argument N ([0..65535] bytes)
+ *
+ * If the entire request is only a single byte long then the number of arguments
+ * is assumed to be zero.
+ */
 struct Argument {
     uint8_t* pointer;
     size_t length;
 };
 
-const int BUFFER_SIZE = 2000;
+
+/*
+ * The request buffer is used to hold all of the information associated with
+ * a request that is received from a paired mobile device. For efficiency, the
+ * arguments are referenced inline in the buffer rather than being copied into
+ * their own memory.
+ */
+const int BUFFER_SIZE = 5000;
 uint8_t buffer[BUFFER_SIZE];
 Argument* arguments = 0;
 
+
+/*
+ * The hardware security module (HSM) encapsulates and protects the private key
+ * and implements all the required public-private cryptographic functions.
+ */
 HSM* hsm;
 
 
@@ -44,6 +75,9 @@ void loop(void) {
 }
 
 
+/*
+ * This function initializes the serial console if one exists.
+ */
 void initConsole() {
     Serial.begin(115200);
     while (!Serial) delay(10);
@@ -53,6 +87,9 @@ void initConsole() {
 }
 
 
+/*
+ * This function initializes the hardware security module (HSM).
+ */
 void initHSM() {
     Serial.println(F("Loading the state of the HSM..."));
     hsm = new HSM();
@@ -61,6 +98,9 @@ void initHSM() {
 }
 
 
+/*
+ * This function initializes the low energy bluetooth processor.
+ */
 void initBluetooth() {
     Serial.println(F("Initializing the bluetooth module..."));
 
@@ -75,8 +115,7 @@ void initBluetooth() {
 
     // Limit the range for connections for better security
     // Allowed values: -40, -20, -16, -12, -8, -4, 0, and 4
-    //Bluefruit.setTxPower(-40);
-    Bluefruit.setTxPower(-4);
+    Bluefruit.setTxPower(-40);
 
     // The name will be displayed in the mobile app
     Bluefruit.setName("ButtonUp™");
@@ -92,7 +131,7 @@ void initBluetooth() {
   
     // Configure and start UART Communication Service
     bleuart.begin();
-    bleuart.setRxCallback(readCallback);
+    bleuart.setRxCallback(requestCallback);
 
     // Configure and start advertising for the device
     Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
@@ -109,8 +148,8 @@ void initBluetooth() {
 }
 
 
-/**
- * This function is invoked each time a connection to the device occurs.
+/*
+ * This callback function is invoked each time a connection to the device occurs.
  */
 void connectCallback(uint16_t connectionHandle) {
     BLEConnection* connection = Bluefruit.Connection(connectionHandle);
@@ -122,10 +161,10 @@ void connectCallback(uint16_t connectionHandle) {
 }
 
 
-/**
- * This function is invoked each time data can be read from the UART.
+/*
+ * This callback function is invoked each time a request is received by the BLE UART.
  */
-void readCallback(uint16_t connectionHandle) {
+void requestCallback(uint16_t connectionHandle) {
 
     // Check for incoming request from mobile device
     if (bleuart.available()) {
@@ -270,10 +309,12 @@ void readCallback(uint16_t connectionHandle) {
                 break;
             }
 
-            // testHSM
+            // testHSM (self test)
             case 42: {
                 Serial.println(F("Test HSM"));
                 testHSM();
+                Serial.println("Test Complete.");
+                Serial.println(F(""));
                 break;
             }
 
@@ -291,8 +332,8 @@ void readCallback(uint16_t connectionHandle) {
 }
 
 
-/**
- * This function is invoked each time a connection to the device is lost.
+/*
+ * This callback function is invoked each time a connection to the device is lost.
  */
 void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
     Serial.print("Disconnected from mobile device - reason code: 0x");
@@ -302,6 +343,10 @@ void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
 }
 
 
+/*
+ * This function generates a new byte array containing the specified number of
+ * random bytes.
+ */
 uint8_t* randomBytes(size_t length) {
     uint8_t* bytes = new uint8_t[length];
     for (size_t i = 0; i < length; i++) {
@@ -311,6 +356,10 @@ uint8_t* randomBytes(size_t length) {
 }
 
 
+/*
+ * This function reads the next request from the BLE UART and its arguments from the request
+ * buffer and indexes the arguments to make them easy to access.
+ */
 uint8_t readRequest() {
     size_t count = bleuart.read(buffer, BUFFER_SIZE);
     if (count == 0 || count == BUFFER_SIZE) {
@@ -334,20 +383,30 @@ uint8_t readRequest() {
 }
 
 
+/*
+ * This function writes the result of a request as a boolean value to the BLE UART.
+ */
 void writeResult(bool result) {
     bleuart.write((uint8_t) result);
 }
 
 
+/*
+ * This function writes the result of a request as a byte array value to the BLE UART.
+ */
 void writeResult(const uint8_t* result, size_t length) {
     bleuart.write(result, length);
 }
 
 
+/*
+ * This function causes the HSM to run a self-test that executes each of its functions
+ * at least once.
+ */
 void testHSM() {
     Serial.println(F("Resetting the HSM..."));
     hsm->resetHSM();
-    Serial.println(F("Done."));
+    Serial.println(F("Succeeded."));
     Serial.println(F(""));
 
     Serial.println(F("Registering a new account..."));
@@ -467,6 +526,7 @@ void testHSM() {
     }
     Serial.println(F(""));
 
+    Serial.println(F("Cleaning up..."));
     delete [] accountId;
     delete [] secretKey;
     delete [] newSecretKey;
