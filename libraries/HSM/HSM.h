@@ -7,7 +7,6 @@
 #include <inttypes.h>
 #include <stddef.h>
 
-#define AID_SIZE 32  // account Id size in bytes
 #define KEY_SIZE 32  // key size in bytes
 #define DIG_SIZE 64  // message digest size in bytes
 #define SIG_SIZE 64  // digital signature size in bytes
@@ -20,14 +19,14 @@
  *
  * The functions are split into two groups, the first which do not require access to
  * the private key:
- *  * digestMessage(accountId, message) => digest
- *  * validSignature(accountId, message, signature, aPublicKey) => isValid?
+ *  * digestMessage(message) => digest
+ *  * validSignature(message, signature, aPublicKey) => isValid?
  *
  * and the second group which do involve the private key which has been encrypted
  * using a secret key that is passed in from a mobile device:
- *  * generateKeys(accountId, secretKey) => publicKey
- *  * signMessage(accountId, secretKey, message) => signature
- *  * eraseKeys(accountId) => success?
+ *  * generateKeys(secretKey) => publicKey
+ *  * signMessage(secretKey, message) => signature
+ *  * eraseKeys() => success?
  *
  * The private key is encrypted using the secret key as follows:
  *    secretKey XOR privateKey => encryptedKey
@@ -89,19 +88,6 @@ class HSM final {
      */
    ~HSM();
 
-   /**
-    * This function resets the hardware security module (HSM) to an uninitialized
-    * state.
-    */
-   void resetHSM();
-
-   /**
-    * This function is passed, from a mobile device, an account Id for the user of the
-    * hardware security module (HSM). Once registered to that account Id, this function
-    * cannot be called again successfully.
-    */
-   bool registerAccount(const uint8_t anAccountId[AID_SIZE]);
-
     /**
      * This function is passed, from a mobile device, a message. It generates, for the
      * message, a digest that can be used later to verify that the content of the message
@@ -109,7 +95,7 @@ class HSM final {
      * returned from the function. It is the responsibilty of the calling program to
      * 'delete []' the digest once it has finished with it.
      */
-    const uint8_t* digestMessage(const uint8_t anAccountId[AID_SIZE], const char* message);
+    const uint8_t* digestMessage(const char* message);
 
     /**
      * This function is passed, from a mobile device, a new secret key. It generates a
@@ -128,11 +114,7 @@ class HSM final {
      * It is the responsibilty of the calling program to 'delete []' the public key
      * once it has finished with it.
      */
-    const uint8_t* generateKeys(
-        const uint8_t anAccountId[AID_SIZE],
-        uint8_t newSecretKey[KEY_SIZE],
-        uint8_t secretKey[KEY_SIZE] = 0
-    );
+    const uint8_t* generateKeys(uint8_t newSecretKey[KEY_SIZE],uint8_t secretKey[KEY_SIZE] = 0);
 
     /**
      * This function is passed, from a mobile device, a secret key and a message to be
@@ -150,11 +132,7 @@ class HSM final {
      * It is the responsibilty of the calling program to 'delete []' the signature
      * once it has finished with it.
      */
-    const uint8_t* signMessage(
-        const uint8_t anAccountId[AID_SIZE],
-        uint8_t secretKey[KEY_SIZE],
-        const char* message
-    );
+    const uint8_t* signMessage(uint8_t secretKey[KEY_SIZE], const char* message);
 
     /**
      * This function is passed, from a mobile device, a message, and a digital signature
@@ -169,23 +147,20 @@ class HSM final {
      * private key in the hardware security module (HSM) is used.
      */
     bool validSignature(
-        const uint8_t anAccountId[AID_SIZE],
         const char* message,
         const uint8_t signature[SIG_SIZE],
         const uint8_t aPublicKey[KEY_SIZE] = 0
     );
 
     /**
-     * This function erases from the processor memory all current and past keys.
-     * The specified account Id must match the account Id stored on the HSM or nothing
-     * is erased. This function should be called when the mobile device associated with
-     * the HSM has been lost or stolen. The function returns a value describing whether
-     * or not the keys were erased.
+     * This function erases from the processor memory all current and past keys. This
+     * function should be called when the mobile device associated with the HSM has
+     * been lost or stolen. The function returns a value describing whether or not the
+     * keys were erased.
      */
-    bool eraseKeys(const uint8_t anAccountId[AID_SIZE]);
+    bool eraseKeys();
 
   private:
-    uint8_t* accountId = 0;
     uint8_t* publicKey = 0;
     uint8_t* encryptedKey = 0;
     uint8_t* previousPublicKey = 0;

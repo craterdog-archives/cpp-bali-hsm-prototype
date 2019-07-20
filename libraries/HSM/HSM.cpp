@@ -42,18 +42,6 @@ void erase(uint8_t* &data, size_t size) {
 
 
 /*
- * This function returns whether or not the specified account Id is invalid.
- */
-bool invalidAccount(
-    const uint8_t anAccountId[AID_SIZE],
-    const uint8_t expectedAccountId[AID_SIZE]
-) {
-    if (expectedAccountId == 0) return true;
-    return (memcmp(anAccountId, expectedAccountId, AID_SIZE) != 0);
-}
-
-
-/*
  * This function returns whether or not the specified public-private key pair is
  * invalid.
  */
@@ -74,37 +62,12 @@ HSM::HSM() {
 
 
 HSM::~HSM() {
-    resetHSM();
-}
-
-
-void HSM::resetHSM() {
-    erase(accountId, AID_SIZE);
-    erase(publicKey, KEY_SIZE);
-    erase(encryptedKey, KEY_SIZE);
-    erase(previousPublicKey, KEY_SIZE);
-    erase(previousEncryptedKey, KEY_SIZE);
-}
-
-
-bool HSM::registerAccount(const uint8_t anAccountId[AID_SIZE]) {
-    if (accountId) {
-        return false;  // already registered
-    }
-    accountId = new uint8_t[AID_SIZE];
-    memcpy(accountId, anAccountId, AID_SIZE);
-    return true;
+    eraseKeys();
 }
 
 
 // NOTE: The returned message digest must be deleted by the calling program.
-const uint8_t* HSM::digestMessage(
-    const uint8_t anAccountId[AID_SIZE],
-    const char* message
-) {
-    if (invalidAccount(anAccountId, accountId)) {
-        return 0;
-    }
+const uint8_t* HSM::digestMessage(const char* message) {
     SHA512 digester;
     size_t messageLength = strlen(message);
     uint8_t* digest = new uint8_t[DIG_SIZE];
@@ -121,14 +84,7 @@ const uint8_t* HSM::digestMessage(
 //  3) The previous key pair is stored and for some reason the subsequent
 //     call to signMessage() never occurred so we must roll back the keys.
 // NOTE: The returned public key must be deleted by the calling program.
-const uint8_t* HSM::generateKeys(
-    const uint8_t anAccountId[AID_SIZE],
-    uint8_t newSecretKey[KEY_SIZE],
-    uint8_t existingSecretKey[KEY_SIZE]
-) {
-    if (invalidAccount(anAccountId, accountId)) {
-        return 0;
-    }
+const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE], uint8_t existingSecretKey[KEY_SIZE]) {
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
 
     // handle any previous keys (case 3 above)
@@ -180,14 +136,8 @@ const uint8_t* HSM::generateKeys(
 
 
 // NOTE: The returned signature must be deleted by the calling program.
-const uint8_t* HSM::signMessage(
-    const uint8_t anAccountId[AID_SIZE],
-    uint8_t secretKey[KEY_SIZE],
-    const char* message
-) {
-    if (publicKey == 0 || invalidAccount(anAccountId, accountId)) {
-        return 0;
-    }
+const uint8_t* HSM::signMessage(uint8_t secretKey[KEY_SIZE], const char* message) {
+    if (publicKey == 0) return 0;
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
 
     // handle any previous key state
@@ -227,14 +177,10 @@ const uint8_t* HSM::signMessage(
 // with the hardware security module (HSM). It should be the key associated with the
 // private key that supposedly signed the message.
 bool HSM::validSignature(
-    const uint8_t anAccountId[AID_SIZE],
     const char* message,
     const uint8_t signature[SIG_SIZE],
     const uint8_t aPublicKey[KEY_SIZE]
 ) {
-    if (invalidAccount(anAccountId, accountId)) {
-        return false;
-    }
     size_t messageLength = strlen(message);
     aPublicKey = aPublicKey ? aPublicKey : publicKey;  // default to the HSM public key
     bool isValid = Ed25519::verify(signature, aPublicKey, (const void*) message, messageLength);
@@ -242,10 +188,7 @@ bool HSM::validSignature(
 }
 
 
-bool HSM::eraseKeys(const uint8_t anAccountId[AID_SIZE]) {
-    if (invalidAccount(anAccountId, accountId)) {
-        return false;
-    }
+bool HSM::eraseKeys() {
     erase(publicKey, KEY_SIZE);
     erase(encryptedKey, KEY_SIZE);
     erase(previousPublicKey, KEY_SIZE);
