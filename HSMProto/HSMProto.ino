@@ -200,7 +200,7 @@ void requestCallback(uint16_t connectionHandle) {
                 uint8_t* newSecretKey = arguments[0].pointer;
                 if (arguments[0].length == KEY_SIZE) {
                     const uint8_t* publicKey;
-                    if (sizeof arguments == 3) {
+                    if (sizeof arguments == 2) {
                         uint8_t* secretKey = arguments[1].pointer;
                         if (arguments[1].length == KEY_SIZE) {
                             publicKey = hsm->generateKeys(newSecretKey, secretKey);
@@ -253,7 +253,7 @@ void requestCallback(uint16_t connectionHandle) {
                 if (arguments[0].length == strlen(message) + 1) {
                     uint8_t* signature = arguments[1].pointer;
                     if (arguments[1].length == SIG_SIZE) {
-                        if (sizeof arguments == 4) {
+                        if (sizeof arguments == 3) {
                             uint8_t* aPublicKey = arguments[2].pointer;
                             if (arguments[2].length == KEY_SIZE) {
                                 success = hsm->validSignature(message, signature, aPublicKey);
