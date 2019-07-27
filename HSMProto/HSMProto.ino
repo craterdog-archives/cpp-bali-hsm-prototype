@@ -4,9 +4,9 @@
 
 
 // Forward Declarations
-uint8_t readRequest(void);
-void writeResult(bool result);
-void writeResult(uint8_t* result, size_t length);
+uint8_t readRequest(uint16_t connectionHandle);
+void writeResult(uint16_t connectionHandle, bool result);
+void writeResult(uint16_t connectionHandle, uint8_t* result, size_t length);
 void testHSM(void);
 
 
@@ -134,7 +134,7 @@ void initBluetooth() {
     // Configure and start UART Communication Service
     bleuart.begin();
     bleuart.setRxCallback(requestCallback);
-    //bleuart.setNotifyCallback(responseCallback);
+    bleuart.setNotifyCallback(notifyCallback);
 
     // Configure and start advertising for the device
     Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
@@ -170,7 +170,7 @@ void connectCallback(uint16_t connectionHandle) {
 void requestCallback(uint16_t connectionHandle) {
 
     // read the next request from the mobile device
-    uint8_t request = readRequest();
+    uint8_t request = readRequest(connectionHandle);
     Serial.print("Request: ");
 
     switch (request) {
@@ -188,15 +188,19 @@ void requestCallback(uint16_t connectionHandle) {
             Serial.println("Digest Message");
             boolean success = false;
             const char* message = (const char*) arguments[0].pointer;
-            if (arguments[0].length == strlen(message) + 1) {
+            if (arguments[0].length == strlen(message)) {
                 const uint8_t* digest = hsm->digestMessage(message);
                 if (digest) {
+                    const char* encoded = Codex::encode(digest, DIG_SIZE);
+                    Serial.print("Message Digest: ");
+                    Serial.println(encoded);
+                    delete [] encoded;
                     success = true;
-                    writeResult(digest, DIG_SIZE);
+                    writeResult(connectionHandle, digest, DIG_SIZE);
                     delete [] digest;
                 }
             }
-            if (!success) writeResult(false);
+            if (!success) writeResult(connectionHandle, false);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -218,14 +222,16 @@ void requestCallback(uint16_t connectionHandle) {
                 }
                 if (publicKey) {
                     success = true;
+                    const char* encoded = Codex::encode(publicKey, KEY_SIZE);
                     Serial.print("Public Key: ");
-                    Serial.println(Codex::encode(publicKey, KEY_SIZE));
-                    writeResult(publicKey, KEY_SIZE);
+                    Serial.println(encoded);
+                    delete [] encoded;
+                    writeResult(connectionHandle, publicKey, KEY_SIZE);
                     delete [] publicKey;
                 }
                 memset(newSecretKey, 0x00, KEY_SIZE);
             }
-            if (!success) writeResult(false);
+            if (!success) writeResult(connectionHandle, false);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -238,19 +244,19 @@ void requestCallback(uint16_t connectionHandle) {
             uint8_t* secretKey = arguments[0].pointer;
             if (arguments[0].length == KEY_SIZE) {
                 const char* message = (const char*) arguments[1].pointer;
-                if (arguments[1].length == strlen(message) + 1) {
+                if (arguments[1].length == strlen(message)) {
                     const uint8_t* signature = hsm->signMessage(secretKey, message);
                     if (signature) {
                         success = true;
                         Serial.print("Signatue: ");
                         Serial.println(Codex::encode(signature, SIG_SIZE));
-                        writeResult(signature, SIG_SIZE);
+                        writeResult(connectionHandle, signature, SIG_SIZE);
                         delete [] signature;
                     }
                 }
             }
             memset(secretKey, 0x00, KEY_SIZE);
-            if (!success) writeResult(false);
+            if (!success) writeResult(connectionHandle, false);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -261,7 +267,7 @@ void requestCallback(uint16_t connectionHandle) {
             Serial.println("Valid Signature?");
             boolean success = false;
             const char* message = (const char*) arguments[0].pointer;
-            if (arguments[0].length == strlen(message) + 1) {
+            if (arguments[0].length == strlen(message)) {
                 uint8_t* signature = arguments[1].pointer;
                 if (arguments[1].length == SIG_SIZE) {
                     if (numberOfArguments == 3) {
@@ -274,7 +280,7 @@ void requestCallback(uint16_t connectionHandle) {
                     }
                 }
             }
-            if (!success) writeResult(false);
+            if (!success) writeResult(connectionHandle, false);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -285,7 +291,7 @@ void requestCallback(uint16_t connectionHandle) {
             Serial.println("Erase Keys");
             boolean success = false;
             success = hsm->eraseKeys();
-            writeResult(success);
+            writeResult(connectionHandle, success);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -300,6 +306,15 @@ void requestCallback(uint16_t connectionHandle) {
         }
     }
 
+}
+
+
+/*
+ * This callback function is invoked each time notification is enabled or disabled.
+ */
+void notifyCallback(uint16_t connectionHandle, bool enabled) {
+    Serial.print("Notification to the mobile device has been ");
+    Serial.println(enabled ? "enabled." : "disabled.");
 }
 
 
@@ -331,8 +346,9 @@ uint8_t* randomBytes(size_t length) {
  * This function reads the next request from the BLE UART and its arguments from the request
  * buffer and indexes the arguments to make them easy to access.
  */
-uint8_t readRequest() {
+uint8_t readRequest(uint16_t connectionHandle) {
     memset(buffer, 0x00, BUFFER_SIZE);
+    Serial.println("Attempting to read...");
     size_t byteCount = bleuart.read(buffer, BUFFER_SIZE);
     Serial.print("Number of bytes read: ");
     Serial.println(byteCount);
@@ -361,8 +377,8 @@ uint8_t readRequest() {
 /*
  * This function writes the result of a request as a boolean value to the BLE UART.
  */
-void writeResult(bool result) {
-    bleuart.write((uint8_t) result);
+void writeResult(uint16_t connectionHandle, bool result) {
+    bleuart.write(result ? 0x01 : 0x00);
     bleuart.flush();
 }
 
@@ -370,7 +386,7 @@ void writeResult(bool result) {
 /*
  * This function writes the result of a request as a byte array value to the BLE UART.
  */
-void writeResult(const uint8_t* result, size_t length) {
+void writeResult(uint16_t connectionHandle, const uint8_t* result, size_t length) {
     bleuart.write(result, length);
     bleuart.flush();
 }
