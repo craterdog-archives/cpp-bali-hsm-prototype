@@ -47,6 +47,7 @@ struct Argument {
 const int BUFFER_SIZE = 5000;
 uint8_t buffer[BUFFER_SIZE];
 Argument* arguments = 0;
+size_t numberOfArguments = 0;
 
 
 /*
@@ -81,9 +82,9 @@ void loop(void) {
 void initConsole() {
     Serial.begin(115200);
     while (!Serial) delay(10);
-    Serial.println(F("Wearable Identity Console"));
-    Serial.println(F("-------------------------"));
-    Serial.println(F(""));
+    Serial.println("Wearable Identity Console");
+    Serial.println("-------------------------");
+    Serial.println("");
 }
 
 
@@ -91,10 +92,10 @@ void initConsole() {
  * This function initializes the hardware security module (HSM).
  */
 void initHSM() {
-    Serial.println(F("Loading the state of the HSM..."));
+    Serial.println("Loading the state of the HSM...");
     hsm = new HSM();
-    Serial.println(F("Done."));
-    Serial.println(F(""));
+    Serial.println("Done.");
+    Serial.println("");
 }
 
 
@@ -102,7 +103,7 @@ void initHSM() {
  * This function initializes the low energy bluetooth processor.
  */
 void initBluetooth() {
-    Serial.println(F("Initializing the bluetooth module..."));
+    Serial.println("Initializing the bluetooth module...");
 
     // Setup the BLE LED to be enabled on CONNECT.
     Bluefruit.autoConnLed(true);
@@ -115,7 +116,7 @@ void initBluetooth() {
 
     // Limit the range for connections for better security
     // Allowed values: -40, -20, -16, -12, -8, -4, 0, and 4
-    Bluefruit.setTxPower(-40);
+    Bluefruit.setTxPower(-20);
 
     // The name will be displayed in the mobile app
     Bluefruit.setName("ButtonUp™");
@@ -132,19 +133,20 @@ void initBluetooth() {
     // Configure and start UART Communication Service
     bleuart.begin();
     bleuart.setRxCallback(requestCallback);
+    //bleuart.setNotifyCallback(responseCallback);
 
     // Configure and start advertising for the device
     Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
-    Bluefruit.Advertising.addTxPower();              // uses the current BLE power level
+    //Bluefruit.Advertising.addTxPower();              // uses the current BLE power level
     Bluefruit.Advertising.addService(bleuart);
-    Bluefruit.ScanResponse.addName();                // uses the device name specified above
+    Bluefruit.Advertising.addName();                 // uses the device name specified above
     Bluefruit.Advertising.restartOnDisconnect(true); // auto advertising when disconnected
     Bluefruit.Advertising.setInterval(32, 244);      // fast mode and slow mode (in units of 0.625 ms)
     Bluefruit.Advertising.setFastTimeout(30);        // timeout in seconds for fast mode, then slow mode
     Bluefruit.Advertising.start(0);                  // 0 = Don't stop advertising after N seconds  
 
-    Serial.println(F("Done."));
-    Serial.println(F(""));
+    Serial.println("Done.");
+    Serial.println("");
 }
 
 
@@ -153,8 +155,8 @@ void initBluetooth() {
  */
 void connectCallback(uint16_t connectionHandle) {
     BLEConnection* connection = Bluefruit.Connection(connectionHandle);
-    char peerName[32] = { 0 };
-    connection->getPeerName(peerName, sizeof(peerName));
+    char peerName[64] = { 0 };
+    connection->getPeerName(peerName, 64);
     Serial.print("Connected to ");
     Serial.println(peerName);
     Serial.println("");
@@ -171,60 +173,60 @@ void requestCallback(uint16_t connectionHandle) {
 
         // read the next request
         uint8_t request = readRequest();
-        Serial.print(F("Request: "));
+        Serial.print("Request: ");
 
         switch (request) {
             // digestMessage
             case 1: {
-                Serial.println(F("Digest Message"));
+                Serial.println("Digest Message");
                 boolean success = false;
                 const char* message = (const char*) arguments[0].pointer;
                 if (arguments[0].length == strlen(message) + 1) {
                     const uint8_t* digest = hsm->digestMessage(message);
                     if (digest) {
                         success = true;
-                        writeResult(digest, sizeof digest);
+                        writeResult(digest, DIG_SIZE);
                         delete [] digest;
                     }
                 }
                 if (!success) writeResult(false);
                 Serial.println(success ? "Succeeded" : "Failed");
-                Serial.println(F(""));
+                Serial.println("");
                 break;
             }
 
             // generateKeys
             case 2: {
-                Serial.println(F("(Re)Generate Keys"));
+                Serial.println("(Re)Generate Keys");
                 boolean success = false;
-                uint8_t* newSecretKey = arguments[0].pointer;
-                if (arguments[0].length == KEY_SIZE) {
+                if (numberOfArguments > 0 && numberOfArguments < 3 && arguments[0].length == KEY_SIZE) {
                     const uint8_t* publicKey;
-                    if (sizeof arguments == 2) {
-                        uint8_t* secretKey = arguments[1].pointer;
-                        if (arguments[1].length == KEY_SIZE) {
-                            publicKey = hsm->generateKeys(newSecretKey, secretKey);
-                        }
-                        memset(secretKey, 0x00, KEY_SIZE);
+                    uint8_t* newSecretKey = arguments[0].pointer;
+                    if (numberOfArguments == 2 && arguments[1].length == KEY_SIZE) {
+                        uint8_t* existingSecretKey = arguments[1].pointer;
+                        publicKey = hsm->generateKeys(newSecretKey, existingSecretKey);
+                        memset(existingSecretKey, 0x00, KEY_SIZE);
                     } else {
                         publicKey = hsm->generateKeys(newSecretKey);
                     }
                     if (publicKey) {
                         success = true;
-                        writeResult(publicKey, sizeof publicKey);
+                        Serial.print("Public Key: ");
+                        Serial.println(Codex::encode(publicKey, KEY_SIZE));
+                        writeResult(publicKey, KEY_SIZE);
                         delete [] publicKey;
                     }
                     memset(newSecretKey, 0x00, KEY_SIZE);
                 }
                 if (!success) writeResult(false);
                 Serial.println(success ? "Succeeded" : "Failed");
-                Serial.println(F(""));
+                Serial.println("");
                 break;
             }
  
             // signMessage
             case 3: {
-                Serial.println(F("Sign Message"));
+                Serial.println("Sign Message");
                 boolean success = false;
                 uint8_t* secretKey = arguments[0].pointer;
                 if (arguments[0].length == KEY_SIZE) {
@@ -233,7 +235,9 @@ void requestCallback(uint16_t connectionHandle) {
                         const uint8_t* signature = hsm->signMessage(secretKey, message);
                         if (signature) {
                             success = true;
-                            writeResult(signature, sizeof signature);
+                            Serial.print("Signatue: ");
+                            Serial.println(Codex::encode(signature, SIG_SIZE));
+                            writeResult(signature, SIG_SIZE);
                             delete [] signature;
                         }
                     }
@@ -241,19 +245,19 @@ void requestCallback(uint16_t connectionHandle) {
                 memset(secretKey, 0x00, KEY_SIZE);
                 if (!success) writeResult(false);
                 Serial.println(success ? "Succeeded" : "Failed");
-                Serial.println(F(""));
+                Serial.println("");
                 break;
             }
  
             // validSignature
             case 4: {
-                Serial.println(F("Valid Signature?"));
+                Serial.println("Valid Signature?");
                 boolean success = false;
                 const char* message = (const char*) arguments[0].pointer;
                 if (arguments[0].length == strlen(message) + 1) {
                     uint8_t* signature = arguments[1].pointer;
                     if (arguments[1].length == SIG_SIZE) {
-                        if (sizeof arguments == 3) {
+                        if (numberOfArguments == 3) {
                             uint8_t* aPublicKey = arguments[2].pointer;
                             if (arguments[2].length == KEY_SIZE) {
                                 success = hsm->validSignature(message, signature, aPublicKey);
@@ -265,35 +269,35 @@ void requestCallback(uint16_t connectionHandle) {
                 }
                 if (!success) writeResult(false);
                 Serial.println(success ? "Succeeded" : "Failed");
-                Serial.println(F(""));
+                Serial.println("");
                 break;
             }
  
             // eraseKeys
             case 5: {
-                Serial.println(F("Erase Keys"));
+                Serial.println("Erase Keys");
                 boolean success = false;
                 success = hsm->eraseKeys();
                 writeResult(success);
                 Serial.println(success ? "Succeeded" : "Failed");
-                Serial.println(F(""));
+                Serial.println("");
                 break;
             }
 
             // testHSM (self test)
             case 42: {
-                Serial.println(F("Test HSM"));
+                Serial.println("Test HSM");
                 testHSM();
                 Serial.println("Test Complete.");
-                Serial.println(F(""));
+                Serial.println("");
                 break;
             }
 
             // invalid
             default: {
                 Serial.print(request);
-                Serial.println(F(" - Invalid request, try again..."));
-                Serial.println(F(""));
+                Serial.println(" - Invalid request, try again...");
+                Serial.println("");
                 break;
             }
         }
@@ -332,15 +336,19 @@ uint8_t* randomBytes(size_t length) {
  * buffer and indexes the arguments to make them easy to access.
  */
 uint8_t readRequest() {
-    size_t count = bleuart.read(buffer, BUFFER_SIZE);
-    if (count == 0 || count == BUFFER_SIZE) {
+    memset(buffer, 0x00, BUFFER_SIZE);
+    size_t byteCount = bleuart.read(buffer, BUFFER_SIZE);
+    Serial.print("Number of bytes read: ");
+    Serial.println(byteCount);
+    if (byteCount == 0 || byteCount == BUFFER_SIZE) {
         // invalid request
         return 0;
     }
     size_t index = 0;
     uint8_t request = buffer[index++];
-    if (request == 42) count = 1;
-    uint8_t numberOfArguments = (count > 1) ? buffer[index++] : 0;
+    numberOfArguments = buffer[index++];
+    Serial.print("Number of arguments: ");
+    Serial.println(numberOfArguments);
     if (arguments) delete [] arguments;
     arguments = new Argument[numberOfArguments];
     for (size_t i = 0; i < numberOfArguments; i++) {
@@ -349,7 +357,7 @@ uint8_t readRequest() {
         arguments[i].length = numberOfBytes;
         index += numberOfBytes;
     }
-    if (index != count) return 0;  // invalid request format
+    if (index != byteCount) return 0;  // invalid request format
     return request;
 }
 
@@ -375,7 +383,7 @@ void writeResult(const uint8_t* result, size_t length) {
  * at least once.
  */
 void testHSM() {
-    Serial.println(F("Generating a message digest..."));
+    Serial.println("Generating a message digest...");
     const char* message = "This is a test of ButtonUp™.";
     const uint8_t* digest = hsm->digestMessage(message);
     if (digest) {
@@ -384,11 +392,11 @@ void testHSM() {
         delete [] encoded;
         delete [] digest;
     } else {
-        Serial.println(F("Failed."));
+        Serial.println("Failed.");
     }
-    Serial.println(F(""));
+    Serial.println("");
 
-    Serial.println(F("Generating an initial key pair..."));
+    Serial.println("Generating an initial key pair...");
     uint8_t* secretKey = randomBytes(KEY_SIZE);
     const uint8_t* publicKey = hsm->generateKeys(secretKey);
     if (publicKey) {
@@ -396,31 +404,31 @@ void testHSM() {
         Serial.println(encoded);
         delete [] encoded;
     } else {
-        Serial.println(F("Failed."));
+        Serial.println("Failed.");
     }
-    Serial.println(F(""));
+    Serial.println("");
 
-    Serial.println(F("Signing the message..."));
+    Serial.println("Signing the message...");
     const uint8_t* signature = hsm->signMessage(secretKey, message);
     if (signature) {
         const char* encoded = Codex::encode(signature, SIG_SIZE);
         Serial.println(encoded);
         delete [] encoded;
     } else {
-        Serial.println(F("Failed."));
+        Serial.println("Failed.");
     }
-    Serial.println(F(""));
+    Serial.println("");
 
-    Serial.println(F("Validating the signature..."));
+    Serial.println("Validating the signature...");
     if (hsm->validSignature(message, signature, publicKey)) {
-        Serial.println(F("Is Valid."));
+        Serial.println("Is Valid.");
     } else {
-        Serial.println(F("Is Invalid."));
+        Serial.println("Is Invalid.");
     }
     delete [] signature;
-    Serial.println(F(""));
+    Serial.println("");
 
-    Serial.println(F("Generating a new key pair..."));
+    Serial.println("Generating a new key pair...");
     uint8_t* newSecretKey = randomBytes(KEY_SIZE);
     const uint8_t* newPublicKey = hsm->generateKeys(newSecretKey, secretKey);
     if (newPublicKey) {
@@ -428,31 +436,31 @@ void testHSM() {
         Serial.println(encoded);
         delete [] encoded;
     } else {
-        Serial.println(F("Failed."));
+        Serial.println("Failed.");
     }
-    Serial.println(F(""));
+    Serial.println("");
 
-    Serial.println(F("Signing the certificate..."));
+    Serial.println("Signing the certificate...");
     signature = hsm->signMessage(secretKey, (const char*) newPublicKey);
     if (signature) {
         const char* encoded = Codex::encode(signature, SIG_SIZE);
         Serial.println(encoded);
         delete [] encoded;
     } else {
-        Serial.println(F("Failed."));
+        Serial.println("Failed.");
     }
-    Serial.println(F(""));
+    Serial.println("");
 
-    Serial.println(F("Validating the signature..."));
+    Serial.println("Validating the signature...");
     if (hsm->validSignature((const char*) newPublicKey, signature, publicKey)) {
-        Serial.println(F("Is Valid."));
+        Serial.println("Is Valid.");
     } else {
-        Serial.println(F("Is Invalid."));
+        Serial.println("Is Invalid.");
     }
     delete [] signature;
-    Serial.println(F(""));
+    Serial.println("");
 
-    Serial.println(F("Signing the message..."));
+    Serial.println("Signing the message...");
     delete [] signature;
     signature = hsm->signMessage(newSecretKey, message);
     if (signature) {
@@ -460,28 +468,28 @@ void testHSM() {
         Serial.println(encoded);
         delete [] encoded;
     } else {
-        Serial.println(F("Failed."));
+        Serial.println("Failed.");
     }
-    Serial.println(F(""));
+    Serial.println("");
 
-    Serial.println(F("Validating the signature..."));
+    Serial.println("Validating the signature...");
     if (hsm->validSignature(message, signature, newPublicKey)) {
-        Serial.println(F("Is Valid."));
+        Serial.println("Is Valid.");
     } else {
-        Serial.println(F("Is Invalid."));
+        Serial.println("Is Invalid.");
     }
     delete [] signature;
-    Serial.println(F(""));
+    Serial.println("");
 
-    Serial.println(F("Erasing the keys..."));
+    Serial.println("Erasing the keys...");
     if (hsm->eraseKeys()) {
-        Serial.println(F("Succeeded."));
+        Serial.println("Succeeded.");
     } else {
-        Serial.println(F("Failed."));
+        Serial.println("Failed.");
     }
-    Serial.println(F(""));
+    Serial.println("");
 
-    Serial.println(F("Cleaning up..."));
+    Serial.println("Cleaning up...");
     delete [] secretKey;
     delete [] newSecretKey;
     delete [] publicKey;
