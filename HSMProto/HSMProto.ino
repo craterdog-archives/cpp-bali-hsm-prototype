@@ -76,7 +76,7 @@ void initBluetooth() {
 
     // Limit the range for connections for better security
     // Allowed values: -40, -20, -16, -12, -8, -4, 0, and 4
-    Bluefruit.setTxPower(-20);
+    Bluefruit.setTxPower(-40);
 
     // The name will be displayed in the mobile app
     Bluefruit.setName("ButtonUp™");
