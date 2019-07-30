@@ -3,60 +3,6 @@
 #include <HSM.h>
 
 
-// Forward Declarations
-uint8_t readRequest(uint16_t connectionHandle);
-void writeResult(uint16_t connectionHandle, bool result);
-void writeResult(uint16_t connectionHandle, uint8_t* result, size_t length);
-void testHSM(void);
-
-
-// Bluetooth Services
-BLEDis  bledis;  // device information service
-BLEUart bleuart; // UART communication service
-
-
-/*
- * This structure is used to reference the section of the request buffer that
- * contains a specific argument that was passed as part of the request. Each
- * request has the following byte format:
- *   Request (1 byte) [0..255]
- *   Number of Arguments (1 byte) [0..255]
- *   Length of Argument 1 (2 bytes) [0..65535]
- *   Argument 1 ([0..65535] bytes)
- *   Length of Argument 2 (2 bytes) [0..65535]
- *   Argument 2 ([0..65535] bytes)
- *      ...
- *   Length of Argument N (2 bytes) [0..65535]
- *   Argument N ([0..65535] bytes)
- *
- * If the entire request is only a single byte long then the number of arguments
- * is assumed to be zero.
- */
-struct Argument {
-    uint8_t* pointer;
-    size_t length;
-};
-
-
-/*
- * The request buffer is used to hold all of the information associated with
- * a request that is received from a paired mobile device. For efficiency, the
- * arguments are referenced inline in the buffer rather than being copied into
- * their own memory.
- */
-const int BUFFER_SIZE = 5000;
-uint8_t buffer[BUFFER_SIZE];
-Argument* arguments = 0;
-size_t numberOfArguments = 0;
-
-
-/*
- * The hardware security module (HSM) encapsulates and protects the private key
- * and implements all the required public-private cryptographic functions.
- */
-HSM* hsm;
-
-
 /*
  * This function configures the adafruit feather. It is called automatically
  * on startup.
@@ -90,6 +36,13 @@ void initConsole() {
 
 
 /*
+ * The hardware security module (HSM) encapsulates and protects the private key
+ * and implements all the required public-private cryptographic functions.
+ */
+HSM* hsm;
+
+
+/*
  * This function initializes the hardware security module (HSM).
  */
 void initHSM() {
@@ -98,6 +51,12 @@ void initHSM() {
     Serial.println("Done.");
     Serial.println("");
 }
+
+
+// Bluetooth Services
+const uint16_t BLOCK_SIZE = 512;  // max MTU size
+BLEDis  bledis;  // device information service
+BLEUart bleuart(BLOCK_SIZE + 1); // UART communication service (allow for terminator)
 
 
 /*
@@ -165,10 +124,63 @@ void connectCallback(uint16_t connectionHandle) {
 
 
 /*
+ * This callback function is invoked each time a connection to the device is lost.
+ */
+void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
+    Serial.print("Disconnected from mobile device - reason code: 0x");
+    Serial.println(reason, HEX);
+    Serial.println("See: ~/Library/Arduino15/packages/adafruit/hardware/nrf52/0.11.1/cores/nRF5/nordic/softdevice/s140_nrf52_6.1.1_API/include/ble_hci.h");
+    Serial.println("");
+}
+
+
+/*
+ * The request buffer is used to hold all of the information associated with one
+ * or more requests that are received from a paired mobile device. For efficiency,
+ * the arguments are referenced inline in the buffer rather than being copied into
+ * their own memory.
+ */
+const int BUFFER_SIZE = 4096;
+uint8_t buffer[BUFFER_SIZE];
+size_t requestSize = 0;
+
+
+/*
+ * This structure is used to reference the section of the request buffer that
+ * contains a specific argument that was passed as part of the request. Each
+ * request has the following byte format:
+ *   Request (1 byte) [0..255]
+ *   Number of Arguments (1 byte) [0..255]
+ *   Length of Argument 1 (2 bytes) [0..65535]
+ *   Argument 1 ([0..65535] bytes)
+ *   Length of Argument 2 (2 bytes) [0..65535]
+ *   Argument 2 ([0..65535] bytes)
+ *      ...
+ *   Length of Argument N (2 bytes) [0..65535]
+ *   Argument N ([0..65535] bytes)
+ *
+ * If the entire request is only a single byte long then the number of arguments
+ * is assumed to be zero.
+ */
+struct Argument {
+    uint8_t* pointer;
+    size_t length;
+};
+Argument* arguments = 0;
+size_t numberOfArguments = 0;
+
+
+// Forward Declarations
+uint8_t readRequest(uint16_t connectionHandle);
+void writeResult(uint16_t connectionHandle, bool result);
+void writeResult(uint16_t connectionHandle, uint8_t* result, size_t length);
+void testHSM(void);
+
+
+/*
  * This callback function is invoked each time a request is received by the BLE UART.
  */
 void requestCallback(uint16_t connectionHandle) {
-
     // read the next request from the mobile device
     uint8_t request = readRequest(connectionHandle);
     Serial.print("Request: ");
@@ -297,10 +309,20 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
+        // extendedRequest
+        case 254: {
+            Serial.println("Extended Request");
+            writeResult(connectionHandle, true);
+            Serial.println("Succeeded");
+            Serial.println("");
+            break;
+        }
+
         // invalid
         default: {
+            Serial.print("Invalid request type (");
             Serial.print(request);
-            Serial.println(" - Invalid request, try again...");
+            Serial.println("), try again...");
             Serial.println("");
             break;
         }
@@ -313,19 +335,6 @@ void requestCallback(uint16_t connectionHandle) {
  * This callback function is invoked each time notification is enabled or disabled.
  */
 void notifyCallback(uint16_t connectionHandle, bool enabled) {
-    Serial.print("Notification to the mobile device has been ");
-    Serial.println(enabled ? "enabled." : "disabled.");
-}
-
-
-/*
- * This callback function is invoked each time a connection to the device is lost.
- */
-void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
-    Serial.print("Disconnected from mobile device - reason code: 0x");
-    Serial.println(reason, HEX);
-    Serial.println("See: ~/Library/Arduino15/packages/adafruit/hardware/nrf52/0.11.1/cores/nRF5/nordic/softdevice/s140_nrf52_6.1.1_API/include/ble_hci.h");
-    Serial.println("");
 }
 
 
@@ -347,29 +356,53 @@ uint8_t* randomBytes(size_t length) {
  * buffer and indexes the arguments to make them easy to access.
  */
 uint8_t readRequest(uint16_t connectionHandle) {
-    memset(buffer, 0x00, BUFFER_SIZE);
     Serial.println("Attempting to read...");
-    size_t byteCount = bleuart.read(buffer, BUFFER_SIZE);
+
+    // Shift the current buffer contents (without the type) over by 511 bytes
+    // [   512 bytes    ][ 511 bytes ][ 511 bytes ]...
+    // [type|...bytes...][...bytes...][...bytes...]...
+    memmove(buffer + BLOCK_SIZE, buffer + 1, BUFFER_SIZE - BLOCK_SIZE);
+
+    // Zero out the first block of the buffer
+    memset(buffer, 0x00, BLOCK_SIZE);
+
+    // Read in the next block of data
+    size_t byteCount = bleuart.read(buffer, BLOCK_SIZE);
     Serial.print("Number of bytes read: ");
     Serial.println(byteCount);
-    if (byteCount == 0 || byteCount == BUFFER_SIZE) {
-        // invalid request
-        return 0;
+    if (byteCount == 0) {
+        Serial.println("Empty request received.");
+        requestSize = 0;
+        return 255;
     }
+
+    requestSize += byteCount;
     size_t index = 0;
     uint8_t request = buffer[index++];
-    numberOfArguments = buffer[index++];
-    Serial.print("Number of arguments: ");
-    Serial.println(numberOfArguments);
-    if (arguments) delete [] arguments;
-    arguments = new Argument[numberOfArguments];
-    for (size_t i = 0; i < numberOfArguments; i++) {
-        uint16_t numberOfBytes = buffer[index++] << 8 | buffer[index++];
-        arguments[i].pointer = buffer + index;
-        arguments[i].length = numberOfBytes;
-        index += numberOfBytes;
+    if (request < 254) {
+        // It's a normal request so parse it
+        numberOfArguments = buffer[index++];
+        Serial.print("Number of arguments: ");
+        Serial.println(numberOfArguments);
+        if (arguments) delete [] arguments;
+        arguments = new Argument[numberOfArguments];
+        for (size_t i = 0; i < numberOfArguments; i++) {
+            uint16_t numberOfBytes = buffer[index++] << 8 | buffer[index++];
+            arguments[i].pointer = buffer + index;
+            arguments[i].length = numberOfBytes;
+            index += numberOfBytes;
+        }
+        if (requestSize > BUFFER_SIZE || index != requestSize) {
+            Serial.print("Invalid request length: ");
+            Serial.println(requestSize);
+            requestSize = 0;
+            return 255;
+        }
+        requestSize = 0;
+    } else {
+        // It's part of an extended request so remove the type and leave only the data
+        requestSize--;
     }
-    if (index != byteCount) return 0;  // invalid request format
     return request;
 }
 
