@@ -54,9 +54,9 @@ void initHSM() {
 
 
 // Bluetooth Services
-const uint16_t BLOCK_SIZE = 512;  // max MTU size
+const uint16_t BLOCK_SIZE = 510;  // max MTU size minus first two bytes
 BLEDis  bledis;  // device information service
-BLEUart bleuart(BLOCK_SIZE + 1); // UART communication service (allow for terminator)
+BLEUart bleuart(BLOCK_SIZE + 3); // UART communication service (FIFO size)
 
 
 /*
@@ -142,6 +142,7 @@ void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
  */
 const int BUFFER_SIZE = 4096;
 uint8_t buffer[BUFFER_SIZE];
+uint8_t requestType;
 size_t requestSize = 0;
 
 
@@ -171,10 +172,9 @@ size_t numberOfArguments = 0;
 
 
 // Forward Declarations
-uint8_t readRequest(uint16_t connectionHandle);
+bool readRequest(uint16_t connectionHandle);
 void writeResult(uint16_t connectionHandle, bool result);
 void writeResult(uint16_t connectionHandle, uint8_t* result, size_t length);
-void testHSM(void);
 
 
 /*
@@ -182,20 +182,24 @@ void testHSM(void);
  */
 void requestCallback(uint16_t connectionHandle) {
     // read the next request from the mobile device
-    uint8_t request = readRequest(connectionHandle);
+    if (!readRequest(connectionHandle)) {
+        Serial.println("Unable to read the request.");
+        writeResult(connectionHandle, 0xFF);
+        return;
+    }
     Serial.print("Request: ");
 
-    switch (request) {
-        // testHSM (self test)
+    switch (requestType) {
+        // Extended Request
         case 0: {
-            Serial.println("Test HSM");
-            testHSM();
-            Serial.println("Test Complete.");
+            Serial.println("Extended Request");
+            writeResult(connectionHandle, true);
+            Serial.println("Succeeded");
             Serial.println("");
             break;
         }
 
-        // digestMessage
+        // Digest Message
         case 1: {
             Serial.println("Digest Message");
             boolean success = false;
@@ -218,7 +222,7 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // generateKeys
+        // (Re)Generate Keys
         case 2: {
             Serial.println("(Re)Generate Keys");
             boolean success = false;
@@ -249,7 +253,7 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // signMessage
+        // Sign Message
         case 3: {
             Serial.println("Sign Message");
             boolean success = false;
@@ -274,7 +278,7 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // validSignature
+        // Valid Signature
         case 4: {
             Serial.println("Valid Signature?");
             boolean success = false;
@@ -298,7 +302,7 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // eraseKeys
+        // Erase Keys
         case 5: {
             Serial.println("Erase Keys");
             boolean success = false;
@@ -309,21 +313,13 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // extendedRequest
-        case 254: {
-            Serial.println("Extended Request");
-            writeResult(connectionHandle, true);
-            Serial.println("Succeeded");
-            Serial.println("");
-            break;
-        }
-
-        // invalid
+        // Invalid Request
         default: {
             Serial.print("Invalid request type (");
-            Serial.print(request);
+            Serial.print(requestType);
             Serial.println("), try again...");
             Serial.println("");
+            writeResult(connectionHandle, 0xFF);
             break;
         }
     }
@@ -353,37 +349,40 @@ uint8_t* randomBytes(size_t length) {
 
 /*
  * This function reads the next request from the BLE UART and its arguments from the request
- * buffer and indexes the arguments to make them easy to access.
+ * buffer and indexes the arguments to make them easy to access. Each request has one of the
+ * following formats:
+ *
+ * One Block of a Large Request (greater than 512 bytes)
+ * [    1 byte    ][      1 byte       ][     510 bytes      ]
+ * [     0xFF     ][ the block number  ][ one block of bytes ]
+ *
+ * The First Block of a Complete Request
+ * [    1 byte    ][      1 byte       ][  510 bytes   ]
+ * [ request type ][number of arguments][block of bytes]
+ *
+ * The buffer containing the full request has the form:
+ * [      2 bytes       ][ size of argument 1 ][      2 bytes       ][ size of argument 2 ]...
+ * [ size of argument 1 ][  argument 1 bytes  ][ size of argument 2 ][  argument 2 bytes  ]...
+ * 
  */
-uint8_t readRequest(uint16_t connectionHandle) {
+bool readRequest(uint16_t connectionHandle) {
     Serial.println("Attempting to read...");
 
-    // Shift the current buffer contents (without the type) over by 511 bytes
-    // [   512 bytes    ][ 511 bytes ][ 511 bytes ]...
-    // [type|...bytes...][...bytes...][...bytes...]...
-    memmove(buffer + BLOCK_SIZE, buffer + 1, BUFFER_SIZE - BLOCK_SIZE);
-
-    // Zero out the first block of the buffer
-    memset(buffer, 0x00, BLOCK_SIZE);
-
-    // Read in the next block of data
-    size_t byteCount = bleuart.read(buffer, BLOCK_SIZE);
-    Serial.print("Number of bytes read: ");
-    Serial.println(byteCount);
-    if (byteCount == 0) {
-        Serial.println("Empty request received.");
-        requestSize = 0;
-        return 255;
-    }
-
-    requestSize += byteCount;
-    size_t index = 0;
-    uint8_t request = buffer[index++];
-    if (request < 254) {
-        // It's a normal request so parse it
-        numberOfArguments = buffer[index++];
+    // Read in the request information
+    requestType = bleuart.read();
+    if (requestType == 0) {
+        // It's an extended sized request so load in one block of it
+        uint8_t blockNumber = bleuart.read();
+        Serial.print("Block number: ");
+        Serial.println(blockNumber);
+        requestSize += bleuart.read(buffer + blockNumber * BLOCK_SIZE, BLOCK_SIZE);
+    } else {
+        // It's a full request so parse it
+        numberOfArguments = bleuart.read();
         Serial.print("Number of arguments: ");
         Serial.println(numberOfArguments);
+        requestSize += bleuart.read(buffer, BLOCK_SIZE);
+        size_t index = 0;
         if (arguments) delete [] arguments;
         arguments = new Argument[numberOfArguments];
         for (size_t i = 0; i < numberOfArguments; i++) {
@@ -392,18 +391,23 @@ uint8_t readRequest(uint16_t connectionHandle) {
             arguments[i].length = numberOfBytes;
             index += numberOfBytes;
         }
-        if (requestSize > BUFFER_SIZE || index != requestSize) {
+        if (requestSize > BUFFER_SIZE || requestSize != index) {
             Serial.print("Invalid request length: ");
             Serial.println(requestSize);
+            Serial.print("Index: ");
+            Serial.println(index);
             requestSize = 0;
-            return 255;
+            return false;
         }
         requestSize = 0;
-    } else {
-        // It's part of an extended request so remove the type and leave only the data
-        requestSize--;
     }
-    return request;
+    if (requestSize > BUFFER_SIZE) {
+        Serial.print("The request length is too long: ");
+        Serial.println(requestSize);
+        requestSize = 0;
+        return false;
+    }
+    return true;
 }
 
 
@@ -424,121 +428,3 @@ void writeResult(uint16_t connectionHandle, const uint8_t* result, size_t length
     bleuart.flush();
 }
 
-
-/*
- * This function causes the HSM to run a self-test that executes each of its functions
- * at least once.
- */
-void testHSM() {
-    Serial.println("Generating a message digest...");
-    const char* message = "This is a test of ButtonUp™.";
-    const uint8_t* digest = hsm->digestMessage(message);
-    if (digest) {
-        const char* encoded = Codex::encode(digest, DIG_SIZE);
-        Serial.println(encoded);
-        delete [] encoded;
-        delete [] digest;
-    } else {
-        Serial.println("Failed.");
-    }
-    Serial.println("");
-
-    Serial.println("Generating an initial key pair...");
-    uint8_t* secretKey = randomBytes(KEY_SIZE);
-    const uint8_t* publicKey = hsm->generateKeys(secretKey);
-    if (publicKey) {
-        const char* encoded = Codex::encode(publicKey, KEY_SIZE);
-        Serial.println(encoded);
-        delete [] encoded;
-    } else {
-        Serial.println("Failed.");
-    }
-    Serial.println("");
-
-    Serial.println("Signing the message...");
-    const uint8_t* signature = hsm->signMessage(secretKey, message);
-    if (signature) {
-        const char* encoded = Codex::encode(signature, SIG_SIZE);
-        Serial.println(encoded);
-        delete [] encoded;
-    } else {
-        Serial.println("Failed.");
-    }
-    Serial.println("");
-
-    Serial.println("Validating the signature...");
-    if (hsm->validSignature(message, signature, publicKey)) {
-        Serial.println("Is Valid.");
-    } else {
-        Serial.println("Is Invalid.");
-    }
-    delete [] signature;
-    Serial.println("");
-
-    Serial.println("Generating a new key pair...");
-    uint8_t* newSecretKey = randomBytes(KEY_SIZE);
-    const uint8_t* newPublicKey = hsm->generateKeys(newSecretKey, secretKey);
-    if (newPublicKey) {
-        const char* encoded = Codex::encode(newPublicKey, KEY_SIZE);
-        Serial.println(encoded);
-        delete [] encoded;
-    } else {
-        Serial.println("Failed.");
-    }
-    Serial.println("");
-
-    Serial.println("Signing the certificate...");
-    signature = hsm->signMessage(secretKey, (const char*) newPublicKey);
-    if (signature) {
-        const char* encoded = Codex::encode(signature, SIG_SIZE);
-        Serial.println(encoded);
-        delete [] encoded;
-    } else {
-        Serial.println("Failed.");
-    }
-    Serial.println("");
-
-    Serial.println("Validating the signature...");
-    if (hsm->validSignature((const char*) newPublicKey, signature, publicKey)) {
-        Serial.println("Is Valid.");
-    } else {
-        Serial.println("Is Invalid.");
-    }
-    delete [] signature;
-    Serial.println("");
-
-    Serial.println("Signing the message...");
-    delete [] signature;
-    signature = hsm->signMessage(newSecretKey, message);
-    if (signature) {
-        const char* encoded = Codex::encode(signature, SIG_SIZE);
-        Serial.println(encoded);
-        delete [] encoded;
-    } else {
-        Serial.println("Failed.");
-    }
-    Serial.println("");
-
-    Serial.println("Validating the signature...");
-    if (hsm->validSignature(message, signature, newPublicKey)) {
-        Serial.println("Is Valid.");
-    } else {
-        Serial.println("Is Invalid.");
-    }
-    delete [] signature;
-    Serial.println("");
-
-    Serial.println("Erasing the keys...");
-    if (hsm->eraseKeys()) {
-        Serial.println("Succeeded.");
-    } else {
-        Serial.println("Failed.");
-    }
-    Serial.println("");
-
-    Serial.println("Cleaning up...");
-    delete [] secretKey;
-    delete [] newSecretKey;
-    delete [] publicKey;
-    delete [] newPublicKey;
-}
