@@ -76,7 +76,7 @@ void initBluetooth() {
 
     // Limit the range for connections for better security
     // Allowed values: -40, -20, -16, -12, -8, -4, 0, and 4
-    Bluefruit.setTxPower(-40);
+    Bluefruit.setTxPower(-20);
 
     // The name will be displayed in the mobile app
     Bluefruit.setName("ButtonUp™");
@@ -199,22 +199,21 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // Digest Message
+        // Digest Bytes
         case 1: {
-            Serial.println("Digest Message");
+            Serial.println("Digest Bytes");
             boolean success = false;
-            const char* message = (const char*) arguments[0].pointer;
-            if (arguments[0].length == strlen(message)) {
-                const uint8_t* digest = hsm->digestMessage(message);
-                if (digest) {
-                    const char* encoded = Codex::encode(digest, DIG_SIZE);
-                    Serial.print("Message Digest: ");
-                    Serial.println(encoded);
-                    delete [] encoded;
-                    success = true;
-                    writeResult(connectionHandle, digest, DIG_SIZE);
-                    delete [] digest;
-                }
+            const uint8_t* bytes = arguments[0].pointer;
+            const size_t size = arguments[0].length;
+            const uint8_t* digest = hsm->digestBytes(bytes, size);
+            if (digest) {
+                const char* encoded = Codex::encode(digest, DIG_SIZE);
+                Serial.print("Bytes Digest: ");
+                Serial.println(encoded);
+                delete [] encoded;
+                success = true;
+                writeResult(connectionHandle, digest, DIG_SIZE);
+                delete [] digest;
             }
             if (!success) writeResult(connectionHandle, false);
             Serial.println(success ? "Succeeded" : "Failed");
@@ -253,22 +252,21 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // Sign Message
+        // Sign Bytes
         case 3: {
-            Serial.println("Sign Message");
+            Serial.println("Sign Bytes");
             boolean success = false;
             uint8_t* secretKey = arguments[0].pointer;
             if (arguments[0].length == KEY_SIZE) {
-                const char* message = (const char*) arguments[1].pointer;
-                if (arguments[1].length == strlen(message)) {
-                    const uint8_t* signature = hsm->signMessage(secretKey, message);
-                    if (signature) {
-                        success = true;
-                        Serial.print("Signatue: ");
-                        Serial.println(Codex::encode(signature, SIG_SIZE));
-                        writeResult(connectionHandle, signature, SIG_SIZE);
-                        delete [] signature;
-                    }
+                const uint8_t* bytes = arguments[1].pointer;
+                const size_t size = arguments[1].length;
+                const uint8_t* signature = hsm->signBytes(secretKey, bytes, size);
+                if (signature) {
+                    success = true;
+                    Serial.print("Signatue: ");
+                    Serial.println(Codex::encode(signature, SIG_SIZE));
+                    writeResult(connectionHandle, signature, SIG_SIZE);
+                    delete [] signature;
                 }
             }
             memset(secretKey, 0x00, KEY_SIZE);
@@ -282,18 +280,17 @@ void requestCallback(uint16_t connectionHandle) {
         case 4: {
             Serial.println("Valid Signature?");
             boolean success = false;
-            const char* message = (const char*) arguments[0].pointer;
-            if (arguments[0].length == strlen(message)) {
-                uint8_t* signature = arguments[1].pointer;
-                if (arguments[1].length == SIG_SIZE) {
-                    if (numberOfArguments == 3) {
-                        uint8_t* aPublicKey = arguments[2].pointer;
-                        if (arguments[2].length == KEY_SIZE) {
-                            success = hsm->validSignature(message, signature, aPublicKey);
-                        }
-                    } else {
-                        success = hsm->validSignature(message, signature);
+            const uint8_t* bytes = arguments[0].pointer;
+            const size_t size = arguments[0].length;
+            uint8_t* signature = arguments[1].pointer;
+            if (arguments[1].length == SIG_SIZE) {
+                if (numberOfArguments == 3) {
+                    uint8_t* aPublicKey = arguments[2].pointer;
+                    if (arguments[2].length == KEY_SIZE) {
+                        success = hsm->validSignature(bytes, size, signature, aPublicKey);
                     }
+                } else {
+                    success = hsm->validSignature(bytes, size, signature);
                 }
             }
             if (!success) writeResult(connectionHandle, false);

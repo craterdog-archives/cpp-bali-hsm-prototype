@@ -5,6 +5,7 @@
 #include <Arduino.h>
 #include <SHA512.h>
 #include <Ed25519.h>
+#include <Codex.h>
 #include "HSM.h"
 
 
@@ -32,7 +33,7 @@ void XOR(
  * NOTE: the data argument is passed by reference so that it can be reset
  * to zero.
  */
-void erase(uint8_t* &data, size_t size) {
+void erase(uint8_t* &data, const size_t size) {
     if (data) {
         memset(data, 0x00, size);
         delete [] data;
@@ -66,12 +67,11 @@ HSM::~HSM() {
 }
 
 
-// NOTE: The returned message digest must be deleted by the calling program.
-const uint8_t* HSM::digestMessage(const char* message) {
+// NOTE: The returned digest must be deleted by the calling program.
+const uint8_t* HSM::digestBytes(const uint8_t* bytes, const size_t size) {
     SHA512 digester;
-    size_t messageLength = strlen(message);
     uint8_t* digest = new uint8_t[DIG_SIZE];
-    digester.update((const void*) message, messageLength);
+    digester.update((const void*) bytes, size);
     digester.finalize(digest, DIG_SIZE);
     return digest;
 }
@@ -82,7 +82,7 @@ const uint8_t* HSM::digestMessage(const char* message) {
 //  1) No keys yet exist, it is being called for the first time.
 //  2) A key pair exists and it is being called to rotate the keys.
 //  3) The previous key pair is stored and for some reason the subsequent
-//     call to signMessage() never occurred so we must roll back the keys.
+//     call to signBytes() never occurred so we must roll back the keys.
 // NOTE: The returned public key must be deleted by the calling program.
 const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE], uint8_t existingSecretKey[KEY_SIZE]) {
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
@@ -135,9 +135,15 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE], uint8_t existin
 }
 
 
-// NOTE: The returned signature must be deleted by the calling program.
-const uint8_t* HSM::signMessage(uint8_t secretKey[KEY_SIZE], const char* message) {
-    if (publicKey == 0) return 0;
+// NOTE: The returned digital signature must be deleted by the calling program.
+const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes, const size_t size) {
+    const char* encoded = Codex::encode(secretKey, KEY_SIZE);
+    Serial.print("secret key: ");
+    Serial.println(encoded);
+    if (publicKey == 0) {
+        Serial.println("public key is zero.");
+        return 0;
+    }
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
 
     // handle any previous key state
@@ -149,15 +155,15 @@ const uint8_t* HSM::signMessage(uint8_t secretKey[KEY_SIZE], const char* message
 
     // validate the private key
     if (invalidKeyPair(currentPublicKey, privateKey)) {
+        Serial.println("invalid key pair.");
         // clean up and bail
         erase(privateKey, KEY_SIZE);
         return 0;  // TODO: analyze as possible side channel
     }
 
-    // sign the message using the private key
+    // sign the bytes using the private key
     uint8_t* signature = new uint8_t[SIG_SIZE];
-    size_t messageLength = strlen(message);
-    Ed25519::sign(signature, privateKey, currentPublicKey, (const void*) message, messageLength);
+    Ed25519::sign(signature, privateKey, currentPublicKey, (const void*) bytes, size);
 
     // erase the private key
     erase(privateKey, KEY_SIZE);
@@ -168,22 +174,22 @@ const uint8_t* HSM::signMessage(uint8_t secretKey[KEY_SIZE], const char* message
         erase(previousEncryptedKey, KEY_SIZE);
     }
 
-    // return the message signature
+    // return the digital signature
     return signature;
 }
 
 
 // NOTE: the specified public key need not be the same public key that is associated
 // with the hardware security module (HSM). It should be the key associated with the
-// private key that supposedly signed the message.
+// private key that supposedly signed the bytes.
 bool HSM::validSignature(
-    const char* message,
+    const uint8_t* bytes,
+    const size_t size,
     const uint8_t signature[SIG_SIZE],
     const uint8_t aPublicKey[KEY_SIZE]
 ) {
-    size_t messageLength = strlen(message);
     aPublicKey = aPublicKey ? aPublicKey : publicKey;  // default to the HSM public key
-    bool isValid = Ed25519::verify(signature, aPublicKey, (const void*) message, messageLength);
+    bool isValid = Ed25519::verify(signature, aPublicKey, (const void*) bytes, size);
     return isValid;
 }
 
