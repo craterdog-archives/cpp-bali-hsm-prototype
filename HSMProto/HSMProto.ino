@@ -29,8 +29,8 @@ void loop(void) {
 void initConsole() {
     Serial.begin(115200);
     while (!Serial) delay(10);
-    Serial.println("Wearable Identity Console");
-    Serial.println("-------------------------");
+    Serial.println("The ButtonUp™ Console");
+    Serial.println("---------------------");
     Serial.println("");
 }
 
@@ -87,7 +87,7 @@ void initBluetooth() {
 
     // Configure and start the Device Information Service
     bledis.setManufacturer("Adafruit Industries");
-    bledis.setModel("Bluefruit Feather52");
+    bledis.setModel("Bluefruit Feather nRF52");
     bledis.begin();
   
     // Configure and start UART Communication Service
@@ -190,16 +190,14 @@ void requestCallback(uint16_t connectionHandle) {
     Serial.print("Request: ");
 
     switch (requestType) {
-        // Extended Request
         case 0: {
-            Serial.println("Extended Request");
+            Serial.println("Load Block");
             writeResult(connectionHandle, true);
             Serial.println("Succeeded");
             Serial.println("");
             break;
         }
 
-        // Digest Bytes
         case 1: {
             Serial.println("Digest Bytes");
             boolean success = false;
@@ -221,18 +219,18 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // (Re)Generate Keys
         case 2: {
-            Serial.println("(Re)Generate Keys");
             boolean success = false;
             if (numberOfArguments > 0 && numberOfArguments < 3 && arguments[0].length == KEY_SIZE) {
                 const uint8_t* publicKey;
                 uint8_t* newSecretKey = arguments[0].pointer;
                 if (numberOfArguments == 2 && arguments[1].length == KEY_SIZE) {
+                    Serial.println("Regenerate Keys");
                     uint8_t* existingSecretKey = arguments[1].pointer;
                     publicKey = hsm->generateKeys(newSecretKey, existingSecretKey);
                     memset(existingSecretKey, 0x00, KEY_SIZE);
                 } else {
+                    Serial.println("Generate Keys");
                     publicKey = hsm->generateKeys(newSecretKey);
                 }
                 if (publicKey) {
@@ -252,7 +250,6 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // Sign Bytes
         case 3: {
             Serial.println("Sign Bytes");
             boolean success = false;
@@ -276,7 +273,6 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // Valid Signature
         case 4: {
             Serial.println("Valid Signature?");
             boolean success = false;
@@ -299,7 +295,6 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // Erase Keys
         case 5: {
             Serial.println("Erase Keys");
             boolean success = false;
@@ -310,7 +305,6 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        // Invalid Request
         default: {
             Serial.print("Invalid request type (");
             Serial.print(requestType);
@@ -376,8 +370,6 @@ bool readRequest(uint16_t connectionHandle) {
     } else {
         // It's a full request so parse it
         numberOfArguments = bleuart.read();
-        Serial.print("Number of arguments: ");
-        Serial.println(numberOfArguments);
         requestSize += bleuart.read(buffer, BLOCK_SIZE);
         size_t index = 0;
         if (arguments) delete [] arguments;
@@ -391,7 +383,7 @@ bool readRequest(uint16_t connectionHandle) {
         if (requestSize > BUFFER_SIZE || requestSize != index) {
             Serial.print("Invalid request length: ");
             Serial.println(requestSize);
-            Serial.print("Index: ");
+            Serial.print("Expected: ");
             Serial.println(index);
             requestSize = 0;
             return false;
