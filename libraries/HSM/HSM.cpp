@@ -3,10 +3,16 @@
  ************************************************************************/
 #include <string.h>
 #include <Arduino.h>
+#include <Adafruit_LittleFS.h>
+#include <InternalFileSystem.h>
 #include <SHA512.h>
 #include <Ed25519.h>
 #include <Codex.h>
 #include "HSM.h"
+
+#define STATE_DIRECTORY    "/cdt"
+#define STATE_FILENAME    "/cdt/state"
+using namespace Adafruit_LittleFS_Namespace;
 
 
 // PRIVATE FREE FUNCTIONS
@@ -59,11 +65,91 @@ bool invalidKeyPair(
 // PUBLIC MEMBER FUNCTIONS
 
 HSM::HSM() {
+    Serial.println("Loading the state of the HSM...");
+    InternalFS.begin();
+    loadState();
 }
 
 
 HSM::~HSM() {
-    eraseKeys();
+    Serial.println("Erasing all transient keys from the HSM...");
+    erase(publicKey, KEY_SIZE);
+    erase(encryptedKey, KEY_SIZE);
+    erase(previousPublicKey, KEY_SIZE);
+    erase(previousEncryptedKey, KEY_SIZE);
+}
+
+
+void HSM::loadState() {
+    if (!InternalFS.exists(STATE_DIRECTORY)) {
+        Serial.println("Creating the state directory...");
+        InternalFS.mkdir(STATE_DIRECTORY);
+    }
+    if (InternalFS.exists(STATE_FILENAME)) {
+        Serial.println("Reading the state file...");
+        File file(STATE_FILENAME, FILE_O_READ, InternalFS);
+        file.read(buffer, BUFFER_SIZE);
+        file.close();
+        Serial.print("STATE: ");
+        Serial.println(Codex::encode(buffer, BUFFER_SIZE));
+        switch (buffer[0]) {
+            case 0:
+                Serial.println("No keys have been created.");
+                break;
+            case 1:
+                Serial.println("Loading the current keys...");
+                publicKey = new uint8_t[KEY_SIZE];
+                memcpy(publicKey, buffer + 1, KEY_SIZE);
+                encryptedKey = new uint8_t[KEY_SIZE];
+                memcpy(encryptedKey, buffer + 1 + KEY_SIZE, KEY_SIZE);
+                break;
+            case 2:
+                Serial.println("Loading the current keys...");
+                publicKey = new uint8_t[KEY_SIZE];
+                memcpy(publicKey, buffer + 1, KEY_SIZE);
+                encryptedKey = new uint8_t[KEY_SIZE];
+                memcpy(encryptedKey, buffer + 1 + KEY_SIZE, KEY_SIZE);
+                Serial.println("Loading the previous keys...");
+                previousPublicKey = new uint8_t[KEY_SIZE];
+                memcpy(previousPublicKey, buffer + 1 + 2 * KEY_SIZE, KEY_SIZE);
+                previousEncryptedKey = new uint8_t[KEY_SIZE];
+                memcpy(previousEncryptedKey, buffer + 1 + 3 * KEY_SIZE, KEY_SIZE);
+                break;
+        }
+    } else {
+        Serial.println("Initializing the state file...");
+        memset(buffer, 0x00, BUFFER_SIZE);
+        InternalFS.remove(STATE_FILENAME);
+        File file(STATE_FILENAME, FILE_O_WRITE, InternalFS);
+        file.write(buffer, BUFFER_SIZE);
+        file.flush();
+        file.close();
+    }
+}
+
+
+void HSM::storeState() {
+    Serial.println("Writing the state file...");
+    memset(buffer, 0x00, BUFFER_SIZE);
+    if (publicKey) {
+        Serial.println("Saving the current keys...");
+        buffer[0]++;
+        memcpy(buffer + 1, publicKey, KEY_SIZE);
+        memcpy(buffer + 1 + KEY_SIZE, encryptedKey, KEY_SIZE);
+    }
+    if (previousPublicKey) {
+        Serial.println("Saving the previous keys...");
+        buffer[0]++;
+        memcpy(buffer + 1 + 2 * KEY_SIZE, previousPublicKey, KEY_SIZE);
+        memcpy(buffer + 1 + 3 * KEY_SIZE, previousEncryptedKey, KEY_SIZE);
+    }
+    InternalFS.remove(STATE_FILENAME);
+    File file(STATE_FILENAME, FILE_O_WRITE, InternalFS);
+    file.write(buffer, BUFFER_SIZE);
+    file.flush();
+    file.close();
+    Serial.print("STATE: ");
+    Serial.println(Codex::encode(buffer, BUFFER_SIZE));
 }
 
 
@@ -95,6 +181,7 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE], uint8_t existin
         memcpy(encryptedKey, previousEncryptedKey, KEY_SIZE);
         erase(previousPublicKey, KEY_SIZE);
         erase(previousEncryptedKey, KEY_SIZE);
+        storeState();
         // now we are back to case 2 above
     }
 
@@ -133,6 +220,7 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE], uint8_t existin
     Serial.println("Hiding the new private key...");
     XOR(newSecretKey, privateKey, encryptedKey);
     erase(privateKey, KEY_SIZE);
+    storeState();
 
     // return a copy of the public key
     Serial.println("Returning the new public key...");
@@ -170,8 +258,10 @@ const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes,
         // erase the private key
         erase(privateKey, KEY_SIZE);
 
+        // erase the previous keys
         erase(previousPublicKey, KEY_SIZE);
         erase(previousEncryptedKey, KEY_SIZE);
+        storeState();
 
     } else {
 
@@ -218,10 +308,20 @@ bool HSM::validSignature(
 
 
 bool HSM::eraseKeys() {
+    Serial.println("Erasing the keys...");
     erase(publicKey, KEY_SIZE);
     erase(encryptedKey, KEY_SIZE);
     erase(previousPublicKey, KEY_SIZE);
     erase(previousEncryptedKey, KEY_SIZE);
+
+    Serial.println("Erasing the state file...");
+    memset(buffer, 0x00, BUFFER_SIZE);
+    InternalFS.remove(STATE_FILENAME);
+    File file(STATE_FILENAME, FILE_O_WRITE, InternalFS);
+    file.write(buffer, BUFFER_SIZE);
+    file.flush();
+    file.close();
+
     return true;
 }
 

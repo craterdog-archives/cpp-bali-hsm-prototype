@@ -88,6 +88,18 @@ class HSM final {
      */
    ~HSM();
 
+   /**
+    * This function loads any persisted key state from the flash memory based file
+    * system.
+    */
+    void loadState();
+
+   /**
+    * This function stores any persisted key state to the flash memory based file
+    * system.
+    */
+    void storeState();
+
     /**
      * This function is passed, from a mobile device, some bytes. It generates, for the
      * bytes, a digest that can be used later to verify that the bytes have not changed.
@@ -162,6 +174,8 @@ class HSM final {
     bool eraseKeys();
 
   private:
+    static const size_t BUFFER_SIZE = 4 * KEY_SIZE + 1;
+    uint8_t buffer[BUFFER_SIZE] = { 0 };
     uint8_t* publicKey = 0;
     uint8_t* encryptedKey = 0;
     uint8_t* previousPublicKey = 0;

@@ -46,7 +46,7 @@ HSM* hsm;
  * This function initializes the hardware security module (HSM).
  */
 void initHSM() {
-    Serial.println("Loading the state of the HSM...");
+    Serial.println("Initializing the hardware security module (HSM)...");
     hsm = new HSM();
     Serial.println("Done.");
     Serial.println("");
@@ -175,6 +175,7 @@ size_t numberOfArguments = 0;
 bool readRequest(uint16_t connectionHandle);
 void writeResult(uint16_t connectionHandle, bool result);
 void writeResult(uint16_t connectionHandle, uint8_t* result, size_t length);
+void writeError(uint16_t connectionHandle);
 
 
 /*
@@ -184,7 +185,7 @@ void requestCallback(uint16_t connectionHandle) {
     // read the next request from the mobile device
     if (!readRequest(connectionHandle)) {
         Serial.println("Unable to read the request.");
-        writeResult(connectionHandle, 0xFF);
+        writeError(connectionHandle);
         return;
     }
     Serial.print("Request: ");
@@ -213,7 +214,7 @@ void requestCallback(uint16_t connectionHandle) {
                 writeResult(connectionHandle, digest, DIG_SIZE);
                 delete [] digest;
             }
-            if (!success) writeResult(connectionHandle, false);
+            if (!success) writeError(connectionHandle);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -244,7 +245,7 @@ void requestCallback(uint16_t connectionHandle) {
                 }
                 memset(newSecretKey, 0x00, KEY_SIZE);
             }
-            if (!success) writeResult(connectionHandle, false);
+            if (!success) writeError(connectionHandle);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -260,14 +261,14 @@ void requestCallback(uint16_t connectionHandle) {
                 const uint8_t* signature = hsm->signBytes(secretKey, bytes, size);
                 if (signature) {
                     success = true;
-                    Serial.print("Signatue: ");
+                    Serial.print("Signature: ");
                     Serial.println(Codex::encode(signature, SIG_SIZE));
                     writeResult(connectionHandle, signature, SIG_SIZE);
                     delete [] signature;
                 }
             }
             memset(secretKey, 0x00, KEY_SIZE);
-            if (!success) writeResult(connectionHandle, false);
+            if (!success) writeError(connectionHandle);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -289,7 +290,7 @@ void requestCallback(uint16_t connectionHandle) {
                     success = hsm->validSignature(bytes, size, signature);
                 }
             }
-            if (!success) writeResult(connectionHandle, false);
+            writeResult(connectionHandle, success);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -297,8 +298,7 @@ void requestCallback(uint16_t connectionHandle) {
 
         case 5: {
             Serial.println("Erase Keys");
-            boolean success = false;
-            success = hsm->eraseKeys();
+            boolean success = hsm->eraseKeys();
             writeResult(connectionHandle, success);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
@@ -310,7 +310,7 @@ void requestCallback(uint16_t connectionHandle) {
             Serial.print(requestType);
             Serial.println("), try again...");
             Serial.println("");
-            writeResult(connectionHandle, 0xFF);
+            writeError(connectionHandle);
             break;
         }
     }
@@ -414,6 +414,15 @@ void writeResult(uint16_t connectionHandle, bool result) {
  */
 void writeResult(uint16_t connectionHandle, const uint8_t* result, size_t length) {
     bleuart.write(result, length);
+    bleuart.flush();
+}
+
+
+/*
+ * This function writes the error result of a request to the BLE UART.
+ */
+void writeError(uint16_t connectionHandle) {
+    bleuart.write(0xFF);
     bleuart.flush();
 }
 
