@@ -16,3 +16,23 @@ To get started with this project you should do the following:
      ```
      ./wearable-hsm-prototype/HSMProto/HSMProto.ino
      ```
+ 1. Connect your feather board to your computer using a micro USB cable.
+ 1. Select the board type (Adafruit Bluefruit Feather nRF52832) from the `Tools/Board` menu.
+ 1. Click on the "check mark" button to compile the sketch, and then on the "right arrow" button to upload it to your board.
+ 1. Finally, click on the "magnifying glass" button in the upper right corner to bring up the Serial Monitor. You should see it output something like the following:
+     ```
+     09:56:11.300 -> The ButtonUp™ Console
+     09:56:12.110 -> ---------------------
+     09:56:12.110 ->
+     09:56:12.110 -> Initializing the hardware security module (HSM)...
+     09:56:12.110 -> Loading the state of the HSM...
+     09:56:12.145 -> Reading the state file...
+     09:56:12.145 -> STATE: 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+     09:56:12.145 -> No keys have been created.
+     09:56:12.145 -> Done.
+     09:56:12.145 ->
+     09:56:12.145 -> Initializing the bluetooth module...
+     09:56:12.425 -> Done.
+     09:56:12.425 ->
+     ```
+
