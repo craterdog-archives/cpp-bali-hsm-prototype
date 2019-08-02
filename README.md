@@ -36,3 +36,63 @@ To get started with this project you should do the following:
      09:56:12.425 ->
      ```
 
+### Binary Protocol
+The feather board prototype implements a binary request protocol that runs over the bluetooth low energy (BLE) transport protocol. The binary protocol supports a small set of request types. Each request has the following form:
+ * request type (1 byte)
+ * number of arguments N (1 byte)
+ * size of first argument K (2 bytes)
+ * first argument (K bytes)
+ * size of second argument L (2 bytes)
+ * second argument (L bytes)
+ * ...
+ * size of Nth argument M (2 bytes)
+ * Nth argument (M bytes)
+
+The first two bytes make up the _header_. The rest of the bytes define the _arguments_ that are passed with the request. If the total size (S bytes) of the request exceeds 512 bytes, the request must be broken up into multiple requests of the form:
+ * block R [(S - 2 header bytes) modulo 510 + 2 header bytes]
+ * block Q [512 bytes]
+ * ...
+ * block 1 [512 bytes]
+ * request [512 bytes]
+
+Each leading block has the following form:
+ * block request (1 byte)
+ * block number N (1 byte)
+ * block bytes (1 to 510 bytes)
+
+Note that the blocks are sent in reverse order, last part of the total request is sent first and the first part of the total request is sent last.
+
+#### Generate Keys
+This request type tells the feather board to generate a new set of keys. It assumes no keys yet exist and returns the new public key. The request has the form:
+ * request type: 0x02
+ * number of arguments: 0x01
+ * size of argument 1: 0x20
+ * argument 1: a new random secret key of 32 bytes
+
+The response has the form:
+ * a public key of 32 bytes
+
+#### Regenerate Keys
+This request type tells the feather board to regenerate the set of keys. It assumes a set of keys already exist and returns the new public key. The request has the form:
+ * request type: 0x02
+ * number of arguments: 0x02
+ * size of argument 1: 0x20
+ * argument 1: a new random secret key of 32 bytes
+ * size of argument 2: 0x20
+ * argument 2: the existing random secret key of 32 bytes
+
+The response has the form:
+ * a public key of 32 bytes
+
+#### Sign Bytes
+This request type tells the feather board to use the private key to digitally sign the specified bytes. The request has the form:
+ * request type: 0x03
+ * number of arguments: 0x02
+ * size of argument 1: 0x20
+ * argument 1: the existing secret key of 32 bytes
+ * size of argument 2: 0xNNNN
+ * argument 2: the N bytes to be digitally signed
+
+The response has the form:
+ * a digital signature of 64 bytes
+
