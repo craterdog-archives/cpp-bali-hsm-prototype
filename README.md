@@ -9,10 +9,10 @@ To get started with this project you should do the following:
  1. Download and install, on your Mac or PC, the [Arduino IDE](https://www.arduino.cc/en/Main/Software).
  1. Configure the IDE by following [these instructions](https://learn.adafruit.com/adafruit-arduino-ide-setup/arduino-1-dot-6-x-ide).
  1. Clone this project on your computer by doing the following:
- ```
- git clone https://github.com/derknorton/wearable-hsm-prototype.git
- ```
+     ```
+     git clone https://github.com/derknorton/wearable-hsm-prototype.git
+     ```
  1. Open the Arduino IDE and load the _sketch_ that is in this folder of the project using the `File/Open...` menu:
- ```
- ./wearable-hsm-prototype/HSMProto/HSMProto.ino
- ```
+     ```
+     ./wearable-hsm-prototype/HSMProto/HSMProto.ino
+     ```
