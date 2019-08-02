@@ -21,7 +21,7 @@ To get started with this project you should do the following:
  1. Click on the "check mark" button to compile the sketch, and then on the "right arrow" button to upload it to your board.
  1. Finally, click on the "magnifying glass" button in the upper right corner to bring up the Serial Monitor. You should see it output something like the following:
      ```
-     09:56:11.300 -> The ButtonUp™ Console
+     09:56:11.300 -> The ButtonUp™ Console
      09:56:12.110 -> ---------------------
      09:56:12.110 ->
      09:56:12.110 -> Initializing the hardware security module (HSM)...
