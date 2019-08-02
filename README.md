@@ -37,30 +37,36 @@ To get started with this project you should do the following:
      ```
 
 ### Binary Protocol
-The feather board prototype implements a binary request protocol that runs over the bluetooth low energy (BLE) transport protocol. The binary protocol supports a small set of request types. Each request has the following form:
- * request type (1 byte)
- * number of arguments N (1 byte)
- * size of first argument K (2 bytes)
- * first argument (K bytes)
- * size of second argument L (2 bytes)
- * second argument (L bytes)
+The feather board prototype implements a binary request protocol that runs on top of the bluetooth low energy (BLE) transport protocol. The binary protocol supports a small set of request types. Each request has the following form:
+```
+[ T ][ N ][  s1  ][   arg 1   ][  s2  ][   arg 2   ]...[  sN  ][   arg N   ]
+```
+
+The byte fields are as follows:
+ * T: request type (1 byte)
+ * N: the number of arguments (1 byte)
+ * s1: the size of first argument (2 bytes)
+ * arg 1: the first argument (s1 bytes)
+ * s2: the size of second argument (2 bytes)
+ * arg 2: the second argument (s2 bytes)
+ *  ...
+ * sN: the size of Nth argument (2 bytes)
+ * arg N: the Nth argument (sN bytes)
+
+A request can currently consist of a maximum of 4096 bytes. The first two bytes make up the _header_ which defines the type of request and how many arguments are included with it. The rest of the bytes define the _arguments_ that are passed with the request.
+
+If the total size of the request (S) exceeds 512 bytes, the request must be broken up into multiple 512 byte blocks that are sent separately:
+ * block R: [0][R][(S - 2) modulo 510 + 2 bytes]
+ * block Q: [0][Q][510 bytes]
  * ...
- * size of Nth argument M (2 bytes)
- * Nth argument (M bytes)
+ * block 2: [0][2][510 bytes]
+ * block 1: [0][1][510 bytes]
+ * request: [T][N][510 bytes]
 
-The first two bytes make up the _header_. The rest of the bytes define the _arguments_ that are passed with the request. If the total size (S bytes) of the request exceeds 512 bytes, the request must be broken up into multiple requests of the form:
- * block R [(S - 2 header bytes) modulo 510 + 2 header bytes]
- * block Q [512 bytes]
- * ...
- * block 1 [512 bytes]
- * request [512 bytes]
-
-Each leading block has the following form:
- * block request (1 byte)
- * block number N (1 byte)
- * block bytes (1 to 510 bytes)
-
-Note that the blocks are sent in reverse order, last part of the total request is sent first and the first part of the total request is sent last.
+Note that the blocks are sent in *reverse* order, the last part of the total request is sent first and the first part of the total request is sent last. The request is then assembled in order by the feather board:
+```
+[request][block 1][block 2]...[block Q][block R]
+```
 
 #### Generate Keys
 This request type tells the feather board to generate a new set of keys. It assumes no keys yet exist and returns the new public key. The request has the form:
