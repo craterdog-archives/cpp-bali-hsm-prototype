@@ -36,6 +36,24 @@ To get started with this project you should do the following:
      09:56:12.425 ->
      ```
 
+### State Machine
+The hardware security module (HSM) implemented by the feather board prototype defines a simple state machine consisting of the three possible state in which the HSM may be at any given time as well as the transitions between states caused by each type of request.
+
+![State Machine](https://raw.githubusercontent.com/derknorton/wearable-hsm-prototype/master/docs/images/StateMachine.png)
+
+The three states include the following:
+ * *No Key Pairs* - There are currently no key pairs stored on the HSM.
+ * *One Key Pair* - A key pair has been generated and is ready to use.
+ * *Two Key Pairs* - The HSM is in the middle of rotating the current key pair.
+
+The six possible request types include the following:
+ * *GenerateKeys* - Generate a new key pair and return the new public key.
+ * *RotateKeys* - Save the existing key pair, generate a new pair and return the new public key.
+ * *EraseKeys* - Erase all key pairs from the hardware security module (HSM).
+ * *DigestBytes* - Generate and return a SHA512 digest of an array of bytes.
+ * *SignBytes* - Digitally sign an array of bytes using the private key and return the digital signature.
+ * *SignatureValid* - Return whether or not a digital signature can be validated using a public key.
+
 ### Binary Protocol
 The feather board prototype implements a binary request protocol that runs on top of the bluetooth low energy (BLE) transport protocol. The binary protocol supports a small set of request types. Each request has the following form:
 ```
