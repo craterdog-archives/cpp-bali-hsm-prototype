@@ -153,27 +153,11 @@ void HSM::storeState() {
 }
 
 
-// NOTE: The returned digest must be deleted by the calling program.
-const uint8_t* HSM::digestBytes(const uint8_t* bytes, const size_t size) {
-    SHA512 digester;
-    uint8_t* digest = new uint8_t[DIG_SIZE];
-    digester.update((const void*) bytes, size);
-    digester.finalize(digest, DIG_SIZE);
-    return digest;
-}
-
-
-// There are three possible states that the HSM can be in when this is
-// called:
-//  1) No keys yet exist, it is being called for the first time.
-//  2) A key pair exists and it is being called to rotate the keys.
-//  3) The previous key pair is stored and for some reason the subsequent
-//     call to signBytes() never occurred so we must roll back the keys.
 // NOTE: The returned public key must be deleted by the calling program.
-const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE], uint8_t existingSecretKey[KEY_SIZE]) {
+const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE]) {
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
 
-    // handle any previous keys (case 3 above)
+    // handle any previous keys
     if (previousPublicKey) {
         Serial.println("A previous key pair already exists, rolling it back to the current key pair...");
         // roll-back the previous regeneration attempt
@@ -182,34 +166,9 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE], uint8_t existin
         erase(previousPublicKey, KEY_SIZE);
         erase(previousEncryptedKey, KEY_SIZE);
         storeState();
-        // now we are back to case 2 above
     }
 
-    // handle existing keys (case 2 above)
-    if (existingSecretKey) {
-        Serial.println("Extracting the existing private key...");
-        XOR(existingSecretKey, encryptedKey, privateKey);
-
-        // validate the private key
-        if (invalidKeyPair(publicKey, privateKey)) {
-            Serial.println("An invalid secret key was passed by the mobile device.");
-            // clean up and bail
-            erase(privateKey, KEY_SIZE);
-            return 0;  // TODO: analyze as possible side channel
-        }
-
-        // save copies of the previous public and encrypted keys
-        Serial.println("Saving the previous key pair...");
-        previousPublicKey = new uint8_t[KEY_SIZE];
-        memcpy(previousPublicKey, publicKey, KEY_SIZE);
-        erase(publicKey, KEY_SIZE);
-        previousEncryptedKey = new uint8_t[KEY_SIZE];
-        memcpy(previousEncryptedKey, encryptedKey, KEY_SIZE);
-        erase(encryptedKey, KEY_SIZE);
-        // now we are in case 1 above
-    }
-
-    // generate a new key pair (case 1 above)
+    // generate a new key pair
     Serial.println("Generating a new key pair...");
     publicKey = new uint8_t[KEY_SIZE];
     encryptedKey = new uint8_t[KEY_SIZE];
@@ -227,6 +186,92 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE], uint8_t existin
     uint8_t* copy = new uint8_t[KEY_SIZE];
     memcpy(copy, publicKey, KEY_SIZE);
     return copy;
+}
+
+
+// NOTE: The returned public key must be deleted by the calling program.
+const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newSecretKey[KEY_SIZE]) {
+    uint8_t* privateKey = new uint8_t[KEY_SIZE];
+
+    // handle any previous keys
+    if (previousPublicKey) {
+        Serial.println("A previous key pair already exists, rolling it back to the current key pair...");
+        // roll-back the previous regeneration attempt
+        memcpy(publicKey, previousPublicKey, KEY_SIZE);
+        memcpy(encryptedKey, previousEncryptedKey, KEY_SIZE);
+        erase(previousPublicKey, KEY_SIZE);
+        erase(previousEncryptedKey, KEY_SIZE);
+        storeState();
+    }
+
+    // handle existing keys
+    Serial.println("Extracting the existing private key...");
+    XOR(existingSecretKey, encryptedKey, privateKey);
+
+    // validate the private key
+    if (invalidKeyPair(publicKey, privateKey)) {
+        Serial.println("An invalid secret key was passed by the mobile device.");
+        // clean up and bail
+        erase(privateKey, KEY_SIZE);
+        return 0;  // TODO: analyze as possible side channel
+    }
+
+    // save copies of the previous public and encrypted keys
+    Serial.println("Saving the previous key pair...");
+    previousPublicKey = new uint8_t[KEY_SIZE];
+    memcpy(previousPublicKey, publicKey, KEY_SIZE);
+    erase(publicKey, KEY_SIZE);
+    previousEncryptedKey = new uint8_t[KEY_SIZE];
+    memcpy(previousEncryptedKey, encryptedKey, KEY_SIZE);
+    erase(encryptedKey, KEY_SIZE);
+
+    // generate a new key pair
+    Serial.println("Generating a new key pair...");
+    publicKey = new uint8_t[KEY_SIZE];
+    encryptedKey = new uint8_t[KEY_SIZE];
+    Ed25519::generatePrivateKey(privateKey);
+    Ed25519::derivePublicKey(publicKey, privateKey);
+
+    // encrypt and save the private key
+    Serial.println("Hiding the new private key...");
+    XOR(newSecretKey, privateKey, encryptedKey);
+    erase(privateKey, KEY_SIZE);
+    storeState();
+
+    // return a copy of the public key
+    Serial.println("Returning the new public key...");
+    uint8_t* copy = new uint8_t[KEY_SIZE];
+    memcpy(copy, publicKey, KEY_SIZE);
+    return copy;
+}
+
+
+bool HSM::eraseKeys() {
+    Serial.println("Erasing the keys...");
+    erase(publicKey, KEY_SIZE);
+    erase(encryptedKey, KEY_SIZE);
+    erase(previousPublicKey, KEY_SIZE);
+    erase(previousEncryptedKey, KEY_SIZE);
+
+    Serial.println("Erasing the state file...");
+    memset(buffer, 0x00, BUFFER_SIZE);
+    InternalFS.remove(STATE_FILENAME);
+    File file(STATE_FILENAME, FILE_O_WRITE, InternalFS);
+    file.write(buffer, BUFFER_SIZE);
+    file.flush();
+    file.close();
+
+    return true;
+}
+
+
+// NOTE: The returned digest must be deleted by the calling program.
+const uint8_t* HSM::digestBytes(const uint8_t* bytes, const size_t size) {
+    SHA512 digester;
+    uint8_t* digest = new uint8_t[DIG_SIZE];
+    digester.update((const void*) bytes, size);
+    digester.finalize(digest, DIG_SIZE);
+    return digest;
 }
 
 
@@ -293,35 +338,12 @@ const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes,
 // with the hardware security module (HSM). It should be the key associated with the
 // private key that supposedly signed the bytes.
 bool HSM::validSignature(
-    const uint8_t* bytes,
-    const size_t size,
+    const uint8_t aPublicKey[KEY_SIZE],
     const uint8_t signature[SIG_SIZE],
-    const uint8_t aPublicKey[KEY_SIZE]
+    const uint8_t* bytes,
+    const size_t size
 ) {
-    if (aPublicKey == 0) {
-        Serial.println("Validating the signature using the local public key...");
-        aPublicKey = publicKey;
-    }
     bool isValid = Ed25519::verify(signature, aPublicKey, (const void*) bytes, size);
     return isValid;
-}
-
-
-bool HSM::eraseKeys() {
-    Serial.println("Erasing the keys...");
-    erase(publicKey, KEY_SIZE);
-    erase(encryptedKey, KEY_SIZE);
-    erase(previousPublicKey, KEY_SIZE);
-    erase(previousEncryptedKey, KEY_SIZE);
-
-    Serial.println("Erasing the state file...");
-    memset(buffer, 0x00, BUFFER_SIZE);
-    InternalFS.remove(STATE_FILENAME);
-    File file(STATE_FILENAME, FILE_O_WRITE, InternalFS);
-    file.write(buffer, BUFFER_SIZE);
-    file.flush();
-    file.close();
-
-    return true;
 }
 

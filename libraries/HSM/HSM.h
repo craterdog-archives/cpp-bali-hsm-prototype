@@ -101,15 +101,6 @@ class HSM final {
     void storeState();
 
     /**
-     * This function is passed, from a mobile device, some bytes. It generates, for the
-     * bytes, a digest that can be used later to verify that the bytes have not changed.
-     * No keys are used to generate the digest. The digest is returned from the function.
-     * It is the responsibilty of the calling program to 'delete []' the digest once it
-     * has finished with it.
-     */
-    const uint8_t* digestBytes(const uint8_t* bytes, const size_t size);
-
-    /**
      * This function is passed, from a mobile device, a new secret key. It generates a
      * new public-private key pair and uses the new secret key to encrypt the new
      * private key using the XOR operation to generate a new encrypted key. Then the
@@ -117,16 +108,41 @@ class HSM final {
      * new private key are erased from the HSM. The new public key is returned from
      * the function.
      *
-     * If an optional existing secret key is passed as well, it is used to reconstruct
-     * the existing private key using the existing encrypted key and verifying it with
-     * the existing public key. If the keys are valid, the existing encrypted key and
-     * existing public key are saved off,and the new versions of the keys are generated
-     * as described above.
+     * It is the responsibilty of the calling program to 'delete []' the public key
+     * once it has finished with it.
+     */
+    const uint8_t* generateKeys(uint8_t newSecretKey[KEY_SIZE]);
+
+    /**
+     * This function is passed, from a mobile device, an existing secret key and a
+     * new secret key. It saves the existing public and encrypted keys and then
+     * generates a new public-private key pair. It uses the new secret key to encrypt
+     * the new private key using the XOR operation to generate a new encrypted key.
+     * Then the new public key and the new encrypted key are saved, and the existing
+     * and new secret keys and the new private key are erased from the HSM. The new
+     * public key is returned from the function.
      *
      * It is the responsibilty of the calling program to 'delete []' the public key
      * once it has finished with it.
      */
-    const uint8_t* generateKeys(uint8_t newSecretKey[KEY_SIZE],uint8_t secretKey[KEY_SIZE] = 0);
+    const uint8_t* rotateKeys(uint8_t existingSecretKey[KEY_SIZE],uint8_t newSecretKey[KEY_SIZE]);
+
+    /**
+     * This function erases from the processor memory all current and previous keys.
+     * This function should be called when the mobile device associated with the HSM
+     * has been lost or stolen. The function returns a value describing whether or
+     * not the keys were successfully erased.
+     */
+    bool eraseKeys();
+
+    /**
+     * This function is passed, from a mobile device, some bytes. It generates, for the
+     * bytes, a digest that can be used later to verify that the bytes have not changed.
+     * No keys are used to generate the digest. The digest is returned from the function.
+     * It is the responsibilty of the calling program to 'delete []' the digest once it
+     * has finished with it.
+     */
+    const uint8_t* digestBytes(const uint8_t* bytes, const size_t size);
 
     /**
      * This function is passed, from a mobile device, a secret key and some bytes to
@@ -154,24 +170,13 @@ class HSM final {
      * key. Note, the specified public key may or may not be the same public key that is
      * associated with the private key maintained by the HSM. The function returns a value
      * describing whether or not the digital signature is valid.
-     *
-     * If a public key is not specified, the public key associated with the current
-     * private key in the hardware security module (HSM) is used.
      */
     bool validSignature(
-        const uint8_t* bytes,
-        const size_t size,
+        const uint8_t aPublicKey[KEY_SIZE],
         const uint8_t signature[SIG_SIZE],
-        const uint8_t aPublicKey[KEY_SIZE] = 0
+        const uint8_t* bytes,
+        const size_t size
     );
-
-    /**
-     * This function erases from the processor memory all current and past keys. This
-     * function should be called when the mobile device associated with the HSM has
-     * been lost or stolen. The function returns a value describing whether or not the
-     * keys were erased.
-     */
-    bool eraseKeys();
 
   private:
     static const size_t BUFFER_SIZE = 4 * KEY_SIZE + 1;

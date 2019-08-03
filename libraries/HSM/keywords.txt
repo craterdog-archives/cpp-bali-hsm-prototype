@@ -1,10 +1,10 @@
 HSM	KEYWORD1
-resetHSM    KEYWORD2
-digestMessage   KEYWORD2
 generateKeys    KEYWORD2
+rotateKeys    KEYWORD2
+eraseKeys    KEYWORD2
+digestMessage   KEYWORD2
 signMessage KEYWORD2
 validSignature  KEYWORD2
-eraseKeys   KEYWORD2
 
 Codex	KEYWORD1
 encode  KEYWORD2
