@@ -134,8 +134,8 @@ This request type tells the feather board to erase from its memory all public-pr
  * **Number of Arguments**: `0x00`
 
 The response from this request type has one of the following forms:
- * **Successful**:`0x01`
- * **Failed**:`0x00`
+ * **Successful**:`0x00` (`false`) or `0x01` (`true`)
+ * **Failed**:`0xFF`
 
 #### Digest Bytes
 This request type tells the feather board to generate a SHA512 digest of a byte array. It is not valid when two public-private key pairs exist, and it returns the digest. The request has the form:
