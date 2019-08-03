@@ -172,10 +172,10 @@ size_t numberOfArguments = 0;
 
 
 // Forward Declarations
-bool readRequest(uint16_t connectionHandle);
-void writeResult(uint16_t connectionHandle, bool result);
-void writeResult(uint16_t connectionHandle, uint8_t* result, size_t length);
-void writeError(uint16_t connectionHandle);
+bool readRequest();
+void writeResult(bool result);
+void writeResult(uint8_t* result, size_t length);
+void writeError();
 
 
 /*
@@ -183,9 +183,9 @@ void writeError(uint16_t connectionHandle);
  */
 void requestCallback(uint16_t connectionHandle) {
     // read the next request from the mobile device
-    if (!readRequest(connectionHandle)) {
+    if (!readRequest()) {
         Serial.println("Unable to read the request.");
-        writeError(connectionHandle);
+        writeError();
         return;
     }
     Serial.print("Request: ");
@@ -193,7 +193,7 @@ void requestCallback(uint16_t connectionHandle) {
     switch (requestType) {
         case 0: {
             Serial.println("Load Block");
-            writeResult(connectionHandle, true);
+            writeResult(true);
             Serial.println("Succeeded");
             Serial.println("");
             break;
@@ -212,11 +212,11 @@ void requestCallback(uint16_t connectionHandle) {
                     Serial.print("Public Key: ");
                     Serial.println(encoded);
                     delete [] encoded;
-                    writeResult(connectionHandle, publicKey, KEY_SIZE);
+                    writeResult(publicKey, KEY_SIZE);
                     delete [] publicKey;
                 }
             }
-            if (!success) writeError(connectionHandle);
+            if (!success) writeError();
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -237,11 +237,11 @@ void requestCallback(uint16_t connectionHandle) {
                     Serial.print("Public Key: ");
                     Serial.println(encoded);
                     delete [] encoded;
-                    writeResult(connectionHandle, publicKey, KEY_SIZE);
+                    writeResult(publicKey, KEY_SIZE);
                     delete [] publicKey;
                 }
             }
-            if (!success) writeError(connectionHandle);
+            if (!success) writeError();
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -250,7 +250,7 @@ void requestCallback(uint16_t connectionHandle) {
         case 3: {
             Serial.println("Erase Keys");
             boolean success = hsm->eraseKeys();
-            writeResult(connectionHandle, success);
+            writeResult(success);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -268,10 +268,10 @@ void requestCallback(uint16_t connectionHandle) {
                 Serial.println(encoded);
                 delete [] encoded;
                 success = true;
-                writeResult(connectionHandle, digest, DIG_SIZE);
+                writeResult(digest, DIG_SIZE);
                 delete [] digest;
             }
-            if (!success) writeError(connectionHandle);
+            if (!success) writeError();
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -290,11 +290,11 @@ void requestCallback(uint16_t connectionHandle) {
                     success = true;
                     Serial.print("Signature: ");
                     Serial.println(Codex::encode(signature, SIG_SIZE));
-                    writeResult(connectionHandle, signature, SIG_SIZE);
+                    writeResult(signature, SIG_SIZE);
                     delete [] signature;
                 }
             }
-            if (!success) writeError(connectionHandle);
+            if (!success) writeError();
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -310,7 +310,7 @@ void requestCallback(uint16_t connectionHandle) {
                 const size_t size = arguments[2].length;
                 success = hsm->validSignature(aPublicKey, signature, bytes, size);
             }
-            writeResult(connectionHandle, success);
+            writeResult(success);
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -321,7 +321,7 @@ void requestCallback(uint16_t connectionHandle) {
             Serial.print(requestType);
             Serial.println("), try again...");
             Serial.println("");
-            writeError(connectionHandle);
+            writeError();
             break;
         }
     }
@@ -333,6 +333,9 @@ void requestCallback(uint16_t connectionHandle) {
  * This callback function is invoked each time notification is enabled or disabled.
  */
 void notifyCallback(uint16_t connectionHandle, bool enabled) {
+    Serial.print("Notification was ");
+    Serial.print(enabled ? "enabled" : "disabled");
+    Serial.print(".");
 }
 
 
@@ -367,7 +370,7 @@ uint8_t* randomBytes(size_t length) {
  * [ size of argument 1 ][  argument 1 bytes  ][ size of argument 2 ][  argument 2 bytes  ]...
  * 
  */
-bool readRequest(uint16_t connectionHandle) {
+bool readRequest() {
     Serial.println("Attempting to read...");
 
     // Read in the request information
@@ -414,7 +417,7 @@ bool readRequest(uint16_t connectionHandle) {
 /*
  * This function writes the result of a request as a boolean value to the BLE UART.
  */
-void writeResult(uint16_t connectionHandle, bool result) {
+void writeResult(bool result) {
     bleuart.write(result ? 0x01 : 0x00);
     bleuart.flush();
 }
@@ -423,7 +426,7 @@ void writeResult(uint16_t connectionHandle, bool result) {
 /*
  * This function writes the result of a request as a byte array value to the BLE UART.
  */
-void writeResult(uint16_t connectionHandle, const uint8_t* result, size_t length) {
+void writeResult(const uint8_t* result, size_t length) {
     bleuart.write(result, length);
     bleuart.flush();
 }
@@ -432,7 +435,7 @@ void writeResult(uint16_t connectionHandle, const uint8_t* result, size_t length
 /*
  * This function writes the error result of a request to the BLE UART.
  */
-void writeError(uint16_t connectionHandle) {
+void writeError() {
     bleuart.write(0xFF);
     bleuart.flush();
 }

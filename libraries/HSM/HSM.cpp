@@ -210,7 +210,7 @@ const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newS
 
     // validate the private key
     if (invalidKeyPair(publicKey, privateKey)) {
-        Serial.println("An invalid secret key was passed by the mobile device.");
+        Serial.println("An invalid existing secret key was passed by the mobile device.");
         // clean up and bail
         erase(privateKey, KEY_SIZE);
         return 0;  // TODO: analyze as possible side channel
