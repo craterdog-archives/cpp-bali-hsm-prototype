@@ -41,18 +41,29 @@ The hardware security module (HSM) implemented by the feather board prototype de
 
 ![State Machine](https://github.com/derknorton/wearable-hsm-prototype/blob/master/docs/images/StateMachine.png)
 
+#### States
 The three states include the following:
- * *No Key Pairs* - There are currently no key pairs stored on the HSM.
- * *One Key Pair* - A key pair has been generated and is ready to use.
- * *Two Key Pairs* - The HSM is in the middle of rotating the current key pair.
+ * _No Key Pairs_ - There are currently no key pairs stored on the HSM.
+ * _One Key Pair_ - A key pair has been generated and is ready to use.
+ * _Two Key Pairs_ - The HSM is in the middle of rotating the current key pair.
 
+#### Request Types
 The six possible request types include the following:
- * *GenerateKeys* - Generate a new key pair and return the new public key.
- * *RotateKeys* - Save the existing key pair, generate a new pair and return the new public key.
- * *EraseKeys* - Erase all key pairs from the hardware security module (HSM).
- * *DigestBytes* - Generate and return a SHA512 digest of an array of bytes.
- * *SignBytes* - Digitally sign an array of bytes using the private key and return the digital signature.
- * *SignatureValid* - Return whether or not a digital signature can be validated using a public key.
+ * _Generate Keys_ - Generate a new key pair and return the new public key.
+ * _Rotate Keys_ - Save the existing key pair, generate a new pair and return the new public key.
+ * _Erase Keys_ - Erase all key pairs from the hardware security module (HSM).
+ * _Digest Bytes_ - Generate and return a SHA512 digest of an array of bytes.
+ * _Sign Bytes_ - Digitally sign an array of bytes using the private key and return the digital signature.
+ * _Signature Valid?_ - Return whether or not a digital signature can be validated using a public key.
+
+Special attention should be paid to the concept of rotating the key pairs. Each key pair is good for signing about 100 byte arrays before it has "leaked" enough information to make calculating the private key a remote possibility. So in general, it is best to rotate the keys about every 100 signing requests. The process of rotating the keys takes several steps:
+ 1. Save the existing key pair.
+ 1. Generate a new key pair and return the new public key to the mobile device.
+ 1. The mobile device embeds the new public key in a public certificate that contains a citation to the public certificate for the previous key pair.
+ 1. The HSM digitally signs the new public certificate using the **previous** private key.
+ 1. The mobile device publishes the new public certificate to the cloud.
+
+This process ensures that each public certificate can be validated using the previous public certificate in the chain. It adds some complexity by requiring a third state in the state machine (Two Key Pairs), but is well worth the added security and auditablility.
 
 ### Binary Protocol
 The feather board prototype implements a binary request protocol that runs on top of the bluetooth low energy (BLE) transport protocol. The binary protocol supports a small set of request types. Each request has the following form:
@@ -61,19 +72,19 @@ The feather board prototype implements a binary request protocol that runs on to
 ```
 
 The byte fields are as follows:
- * *T*: request type (1 byte)
- * *N*: the number of arguments (1 byte)
- * *s1*: the size of first argument (2 bytes)
- * *arg 1*: the first argument (s1 bytes)
- * *s2*: the size of second argument (2 bytes)
- * *arg 2*: the second argument (s2 bytes)
+ * _T_: request type (1 byte)
+ * _N_: the number of arguments (1 byte)
+ * _s1_: the size of first argument (2 bytes)
+ * _arg 1_: the first argument (s1 bytes)
+ * _s2_: the size of second argument (2 bytes)
+ * _arg 2_: the second argument (s2 bytes)
  *   ⋮
- * *sN*: the size of Nth argument (2 bytes)
- * *arg N*: the Nth argument (sN bytes)
+ * _sN_: the size of Nth argument (2 bytes)
+ * _arg N_: the Nth argument (sN bytes)
 
 A request can currently consist of a maximum of 4096 bytes. The first two bytes make up the _header_ which defines the type of request and how many arguments are included with it. The rest of the bytes define the _arguments_ that are passed with the request.
 
-If the total size of the request `S` exceeds 512 bytes, the request must be broken up into an additional `K` 512 byte blocks that are each sent separately before sending the actual request block:
+If the total size `S` of the request exceeds 512 bytes, the request must be broken up into an additional `K` 512 byte blocks that are each sent separately before sending the actual request block:
 ```
 [0][K][((S - 2) modulo 510) + 2 bytes]
 [0][J][510 bytes]
@@ -84,10 +95,12 @@ If the total size of the request `S` exceeds 512 bytes, the request must be brok
 [T][N][510 bytes]
 ```
 
-Each additional block has a request type of zero with the second byte in the header being the block number. The blocks are sent in *reverse* order, the last part of the total request is sent first and the first part of the total request is sent last. The request is then assembled in order by the feather board:
+Each additional block has a request type of zero with the second byte in the header being the block number. The blocks are sent in **reverse** order, the last part of the total request is sent first and the first part of the total request is sent last. The request is then assembled in order by the feather board:
 ```
 [request][block 1][block 2]...[block I][block J][block K]
 ```
+
+The reasoning behind this ordering is that the feather board need not care about the content of the additional blocks until the request itself has been received.
 
 #### Generate Keys
 This request type tells the feather board to generate a new set of keys. It assumes no keys yet exist and returns the new public key. The request has the form:
