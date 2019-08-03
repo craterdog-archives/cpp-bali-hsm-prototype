@@ -67,9 +67,7 @@ The byte fields are as follows:
  * *arg 1*: the first argument (s1 bytes)
  * *s2*: the size of second argument (2 bytes)
  * *arg 2*: the second argument (s2 bytes)
- * 
- * 
- * 
+   * ⋮
  * *sN*: the size of Nth argument (2 bytes)
  * *arg N*: the Nth argument (sN bytes)
 
@@ -80,9 +78,7 @@ If the total size of the request `S` exceeds 512 bytes, the request must be brok
 [0][K][((S - 2) modulo 510) + 2 bytes]
 [0][J][510 bytes]
 [0][I][510 bytes]
-  .
-  .
-  .
+  ⋮
 [0][2][510 bytes]
 [0][1][510 bytes]
 [T][N][510 bytes]
