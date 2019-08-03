@@ -61,25 +61,40 @@ The feather board prototype implements a binary request protocol that runs on to
 ```
 
 The byte fields are as follows:
- * T: request type (1 byte)
- * N: the number of arguments (1 byte)
- * s1: the size of first argument (2 bytes)
- * arg 1: the first argument (s1 bytes)
- * s2: the size of second argument (2 bytes)
- * arg 2: the second argument (s2 bytes)
+ * *T*: request type (1 byte)
+ * *N*: the number of arguments (1 byte)
+ * *s1*: the size of first argument (2 bytes)
+ * *arg 1*: the first argument (s1 bytes)
+ * *s2*: the size of second argument (2 bytes)
+ * *arg 2*: the second argument (s2 bytes)
  *  ...
- * sN: the size of Nth argument (2 bytes)
- * arg N: the Nth argument (sN bytes)
+ * *sN*: the size of Nth argument (2 bytes)
+ * *arg N*: the Nth argument (sN bytes)
 
 A request can currently consist of a maximum of 4096 bytes. The first two bytes make up the _header_ which defines the type of request and how many arguments are included with it. The rest of the bytes define the _arguments_ that are passed with the request.
 
 If the total size of the request (S) exceeds 512 bytes, the request must be broken up into multiple 512 byte blocks that are sent separately:
- * block R: [0][R][(S - 2) modulo 510 + 2 bytes]
- * block Q: [0][Q][510 bytes]
+ * *block R*
+     ```
+     [0][R][(S - 2) modulo 510 + 2 bytes]
+     ```
+ * *block Q*
+     ```
+     [0][Q][510 bytes]
+     ```
  * ...
- * block 2: [0][2][510 bytes]
- * block 1: [0][1][510 bytes]
- * request: [T][N][510 bytes]
+ * *block 2*
+     ```
+     [0][2][510 bytes]
+     ```
+ * *block 1*
+     ```
+     [0][1][510 bytes]
+     ```
+ * *request*
+     ```
+     [T][N][510 bytes]
+     ```
 
 Note that the blocks are sent in *reverse* order, the last part of the total request is sent first and the first part of the total request is sent last. The request is then assembled in order by the feather board:
 ```
