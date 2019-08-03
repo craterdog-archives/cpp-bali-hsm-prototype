@@ -39,7 +39,7 @@ To get started with this project you should do the following:
 ### State Machine
 The hardware security module (HSM) implemented by the feather board prototype defines a simple state machine consisting of the three possible state in which the HSM may be at any given time as well as the transitions between states caused by each type of request.
 
-![State Machine](https://raw.githubusercontent.com/derknorton/wearable-hsm-prototype/master/docs/images/StateMachine.png)
+![State Machine](https://github.com/derknorton/wearable-hsm-prototype/blob/master/docs/images/StateMachine.png)
 
 The three states include the following:
  * *No Key Pairs* - There are currently no key pairs stored on the HSM.
