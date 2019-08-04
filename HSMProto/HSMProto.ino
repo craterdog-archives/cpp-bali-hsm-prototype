@@ -187,7 +187,7 @@ void updateState() {
  * the arguments are referenced inline in the buffer rather than being copied into
  * their own memory.
  */
-const int BUFFER_SIZE = 4096;
+const int BUFFER_SIZE = 40000;
 uint8_t buffer[BUFFER_SIZE];
 
 

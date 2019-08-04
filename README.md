@@ -88,7 +88,7 @@ The byte fields are as follows:
  * _arg N_: the Nth argument (sN bytes)
 
 #### Additional Blocks
-A request can currently consist of a maximum of 4096 bytes. The first two bytes make up the _header_ which defines the type of request and how many arguments are included with it. The rest of the bytes define the _arguments_ that are passed with the request.
+A request can consist of a maximum of 40,000 bytes. The first two bytes make up the _header_ which defines the type of request and how many arguments are included with it. The rest of the bytes define the _arguments_ that are passed with the request.
 
 If the total size `S` of the request exceeds 512 bytes, the request must be broken up into an additional `K` 512 byte blocks that are each sent separately before sending the actual request block:
 ```
