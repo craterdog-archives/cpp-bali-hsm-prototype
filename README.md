@@ -18,8 +18,12 @@ To get started with this project you should do the following:
      ```
  1. Connect your feather board to your computer using a micro USB cable.
  1. Select the board type (Adafruit Bluefruit Feather nRF52832) from the `Tools/Board` menu.
+ 1. Select the serial port as something like "cu.SLAB_USBtoUART" from the `Tools/Port` menu.
+ 1. The nRF52832 processor has an outdated bootloader. Select the "Bootloader DFU for the nRF52832" from the `Tools/Programmer` menu.
+ 1. Upload the new bootloader by selecting `Tools/Burn Bootloader` and then wait for it to finish.
+ 1. Then select the "Arduino as ISP" programmer from the `Tools/Programmer` menu.
  1. Click on the "check mark" button to compile the sketch, and then on the "right arrow" button to upload it to your board.
- 1. Finally, click on the "magnifying glass" button in the upper right corner to bring up the Serial Monitor. You should see it output something like the following:
+ 1. When the code is done uploading, click on the "magnifying glass" button in the upper right corner to bring up the Serial Monitor. You should see it output something like the following:
      ```
      09:56:11.300 -> The ButtonUp™ Console
      09:56:12.110 -> ---------------------
