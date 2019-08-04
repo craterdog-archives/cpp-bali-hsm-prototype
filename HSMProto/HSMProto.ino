@@ -135,6 +135,53 @@ void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
 
 
 /*
+ * This enumeration defines the possible request types the HSM can receive.
+ */
+enum RequestType {
+    loadBlock = 0x00,
+    generateKeys = 0x01,
+    rotateKeys = 0x02,
+    eraseKeys = 0x03,
+    digestBytes = 0x04,
+    signBytes = 0x05,
+    validSignature = 0x06
+};
+
+RequestType requestType = loadBlock;
+
+size_t requestSize = 0;
+
+
+/*
+ * This enumeration defines the possible states the HSM can be in.
+ */
+enum State {
+    invalid = 0,
+    noKeyPairs = 1,
+    oneKeyPair = 2,
+    twoKeyPairs = 3
+};
+
+State currentState = noKeyPairs;
+
+State nextState[4][7] = {
+   // loadBlock   generateKeys  rotateKeys   eraseKeys  digestBytes  signBytes   validBytes
+    { invalid,     invalid,     invalid,     invalid,    invalid,    invalid,    invalid,   }, // invalid
+    { noKeyPairs,  oneKeyPair,  invalid,     noKeyPairs, noKeyPairs, invalid,    noKeyPairs }, // noKeyPairs
+    { oneKeyPair,  invalid,     twoKeyPairs, noKeyPairs, oneKeyPair, oneKeyPair, oneKeyPair }, // oneKeyPair
+    { twoKeyPairs, invalid,     invalid,     noKeyPairs, invalid,    oneKeyPair, invalid }     // twoKeyPairs
+};
+
+bool validState() {
+    return nextState[currentState][requestType] > 0;
+};
+
+void updateState() {
+    currentState = nextState[currentState][requestType];
+};
+
+
+/*
  * The request buffer is used to hold all of the information associated with one
  * or more requests that are received from a paired mobile device. For efficiency,
  * the arguments are referenced inline in the buffer rather than being copied into
@@ -142,8 +189,6 @@ void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
  */
 const int BUFFER_SIZE = 4096;
 uint8_t buffer[BUFFER_SIZE];
-uint8_t requestType;
-size_t requestSize = 0;
 
 
 /*
@@ -191,7 +236,7 @@ void requestCallback(uint16_t connectionHandle) {
     Serial.print("Request: ");
 
     switch (requestType) {
-        case 0: {
+        case loadBlock: {
             Serial.println("Load Block");
             writeResult(true);
             Serial.println("Succeeded");
@@ -199,10 +244,10 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case 1: {
+        case generateKeys: {
             Serial.println("Generate Keys");
-            boolean success = false;
-            if (arguments[0].length == KEY_SIZE) {
+            bool success = false;
+            if (validState() && arguments[0].length == KEY_SIZE) {
                 uint8_t* newSecretKey = arguments[0].pointer;
                 const uint8_t* publicKey = hsm->generateKeys(newSecretKey);
                 memset(newSecretKey, 0x00, KEY_SIZE);
@@ -214,6 +259,7 @@ void requestCallback(uint16_t connectionHandle) {
                     delete [] encoded;
                     writeResult(publicKey, KEY_SIZE);
                     delete [] publicKey;
+                    updateState();
                 }
             }
             if (!success) writeError();
@@ -222,10 +268,10 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case 2: {
+        case rotateKeys: {
             Serial.println("Rotate Keys");
-            boolean success = false;
-            if (arguments[0].length == KEY_SIZE && arguments[1].length == KEY_SIZE) {
+            bool success = false;
+            if (validState() && arguments[0].length == KEY_SIZE && arguments[1].length == KEY_SIZE) {
                 uint8_t* existingSecretKey = arguments[0].pointer;
                 uint8_t* newSecretKey = arguments[1].pointer;
                 const uint8_t* publicKey = hsm->rotateKeys(existingSecretKey, newSecretKey);
@@ -239,6 +285,7 @@ void requestCallback(uint16_t connectionHandle) {
                     delete [] encoded;
                     writeResult(publicKey, KEY_SIZE);
                     delete [] publicKey;
+                    updateState();
                 }
             }
             if (!success) writeError();
@@ -247,29 +294,15 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case 3: {
+        case eraseKeys: {
             Serial.println("Erase Keys");
-            boolean success = hsm->eraseKeys();
-            writeResult(success);
-            Serial.println(success ? "Succeeded" : "Failed");
-            Serial.println("");
-            break;
-        }
-
-        case 4: {
-            Serial.println("Digest Bytes");
-            boolean success = false;
-            const uint8_t* bytes = arguments[0].pointer;
-            const size_t size = arguments[0].length;
-            const uint8_t* digest = hsm->digestBytes(bytes, size);
-            if (digest) {
-                const char* encoded = Codex::encode(digest, DIG_SIZE);
-                Serial.print("Bytes Digest: ");
-                Serial.println(encoded);
-                delete [] encoded;
-                success = true;
-                writeResult(digest, DIG_SIZE);
-                delete [] digest;
+            bool success = false;
+            if (validState()) {
+                if (hsm->eraseKeys()) {
+                    success = true;
+                    writeResult(success);
+                    updateState();
+                }
             }
             if (!success) writeError();
             Serial.println(success ? "Succeeded" : "Failed");
@@ -277,10 +310,34 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case 5: {
+        case digestBytes: {
+            Serial.println("Digest Bytes");
+            bool success = false;
+            if (validState()) {
+                const uint8_t* bytes = arguments[0].pointer;
+                const size_t size = arguments[0].length;
+                const uint8_t* digest = hsm->digestBytes(bytes, size);
+                if (digest) {
+                    const char* encoded = Codex::encode(digest, DIG_SIZE);
+                    Serial.print("Bytes Digest: ");
+                    Serial.println(encoded);
+                    delete [] encoded;
+                    success = true;
+                    writeResult(digest, DIG_SIZE);
+                    delete [] digest;
+                    updateState();
+                }
+            }
+            if (!success) writeError();
+            Serial.println(success ? "Succeeded" : "Failed");
+            Serial.println("");
+            break;
+        }
+
+        case signBytes: {
             Serial.println("Sign Bytes");
-            boolean success = false;
-            if (arguments[0].length == KEY_SIZE) {
+            bool success = false;
+            if (validState() && arguments[0].length == KEY_SIZE) {
                 uint8_t* secretKey = arguments[0].pointer;
                 const uint8_t* bytes = arguments[1].pointer;
                 const size_t size = arguments[1].length;
@@ -292,6 +349,7 @@ void requestCallback(uint16_t connectionHandle) {
                     Serial.println(Codex::encode(signature, SIG_SIZE));
                     writeResult(signature, SIG_SIZE);
                     delete [] signature;
+                    updateState();
                 }
             }
             if (!success) writeError();
@@ -300,17 +358,19 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case 6: {
+        case validSignature: {
             Serial.println("Valid Signature?");
-            boolean success = false;
-            if (arguments[0].length == KEY_SIZE && arguments[1].length == SIG_SIZE) {
+            bool success = false;
+            if (validState() && arguments[0].length == KEY_SIZE && arguments[1].length == SIG_SIZE) {
                 uint8_t* aPublicKey = arguments[0].pointer;
                 uint8_t* signature = arguments[1].pointer;
                 const uint8_t* bytes = arguments[2].pointer;
                 const size_t size = arguments[2].length;
                 success = hsm->validSignature(aPublicKey, signature, bytes, size);
+                writeResult(success);
+                updateState();
             }
-            writeResult(success);
+            if (!success) writeError();
             Serial.println(success ? "Succeeded" : "Failed");
             Serial.println("");
             break;
@@ -333,9 +393,11 @@ void requestCallback(uint16_t connectionHandle) {
  * This callback function is invoked each time notification is enabled or disabled.
  */
 void notifyCallback(uint16_t connectionHandle, bool enabled) {
+    /*
     Serial.print("Notification was ");
     Serial.print(enabled ? "enabled" : "disabled");
-    Serial.print(".");
+    Serial.println(".");
+    */
 }
 
 
@@ -374,7 +436,7 @@ bool readRequest() {
     Serial.println("Attempting to read...");
 
     // Read in the request information
-    requestType = bleuart.read();
+    requestType = (RequestType) bleuart.read();
     if (requestType == 0) {
         // It's an extended sized request so load in one block of it
         uint8_t blockNumber = bleuart.read();
