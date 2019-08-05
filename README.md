@@ -110,6 +110,9 @@ The reasoning behind this ordering is that the feather board need not care about
 
 #### Generate Keys
 This request type tells the feather board to generate a new public-private key pair. It is only valid if no keys yet exist and it returns the new public key. The request has the form:
+```
+[0x01][0x01][0x0020][32 bytes]
+```
  * **Request Type**: `0x01`
  * **Number of Arguments**: `0x01`
  * **Size of Argument 1**: `0x0020`
@@ -121,6 +124,9 @@ The response from this request type has one of the following forms:
 
 #### Rotate Keys
 This request type tells the feather board to save a copy of the existing public-private key pair and then generate a new public-private key pair. It is only valid exactly one public-private key pair exists and it returns the new public key. The request has the form:
+```
+[0x02][0x02][0x0020][32 bytes][0x0020][32 bytes]
+```
  * **Request Type**: `0x02`
  * **Number of Arguments**: `0x02`
  * **Size of Argument 1**: `0x0020`
@@ -134,6 +140,9 @@ The response from this request type has one of the following forms:
 
 #### Erase Keys
 This request type tells the feather board to erase from its memory all public-private key pairs. It is valid when the board is in any state. The request has the form:
+```
+[0x03][0x00]
+```
  * **Request Type**: `0x03`
  * **Number of Arguments**: `0x00`
 
@@ -143,9 +152,12 @@ The response from this request type has one of the following forms:
 
 #### Digest Bytes
 This request type tells the feather board to generate a SHA512 digest of a byte array. It is not valid when two public-private key pairs exist, and it returns the digest. The request has the form:
+```
+[0x04][0x01][0xnnnn][N bytes]
+```
  * **Request Type**: `0x04`
  * **Number of Arguments**: `0x01`
- * **Size of Argument 1**: `0x0nnn`
+ * **Size of Argument 1**: `0xnnnn`
  * **Argument 1**: `[a byte array of N bytes]`
 
 The response from this request type has one of the following forms:
@@ -154,11 +166,14 @@ The response from this request type has one of the following forms:
 
 #### Sign Bytes
 This request type tells the feather board to digitally sign a byte array using the current, or if one exists, previous private key. It is only valid when at least one public-private key pair exists, and it returns the digital signature. The request has the form:
+```
+[0x05][0x02][0x0020][32 bytes][0xnnnn][N bytes]
+```
  * **Request Type**: `0x05`
  * **Number of Arguments**: `0x02`
  * **Size of Argument 1**: `0x0020`
  * **Argument 1**: `[the previous or current secret key of 32 bytes]`
- * **Size of Argument 2**: `0x0nnn`
+ * **Size of Argument 2**: `0xnnnn`
  * **Argument 2**: `[a byte array of N bytes]`
 
 The response from this request type has one of the following forms:
@@ -167,13 +182,16 @@ The response from this request type has one of the following forms:
 
 #### Signature Valid?
 This request type tells the feather board to determine whether or not a digital signature and a byte array can be validated using a public key. It is not valid when two public-private key pairs exist. The request has the form:
+```
+[0x06][0x03][0x0020][32 bytes][0x0040][64 bytes][0xnnnn][N bytes]
+```
  * **Request Type**: `0x06`
  * **Number of Arguments**: `0x03`
  * **Size of Argument 3**: `0x0020`
  * **Argument 1**: `[a public key of 32 bytes]`
  * **Size of Argument 2**: `0x0040`
  * **Argument 2**: `[a digital signature of 64 bytes]`
- * **Size of Argument 1**: `0x0nnn`
+ * **Size of Argument 1**: `0xnnnn`
  * **Argument 3**: `[a byte array of N bytes]`
 
 The response from this request type has one of the following forms:
