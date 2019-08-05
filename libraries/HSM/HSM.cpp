@@ -86,7 +86,8 @@ void HSM::loadState() {
     }
     if (InternalFS.exists(STATE_FILENAME)) {
         Serial.println("Reading the state file...");
-        File file(STATE_FILENAME, FILE_O_READ, InternalFS);
+        File file(InternalFS);
+        file.open(STATE_FILENAME, FILE_O_READ);
         file.read(buffer, BUFFER_SIZE);
         file.close();
         switch (buffer[0]) {
@@ -117,7 +118,8 @@ void HSM::loadState() {
         Serial.println("Initializing the state file...");
         memset(buffer, 0x00, BUFFER_SIZE);
         InternalFS.remove(STATE_FILENAME);
-        File file(STATE_FILENAME, FILE_O_WRITE, InternalFS);
+        File file(InternalFS);
+        file.open(STATE_FILENAME, FILE_O_WRITE);
         file.write(buffer, BUFFER_SIZE);
         file.flush();
         file.close();
@@ -141,7 +143,8 @@ void HSM::storeState() {
         memcpy(buffer + 1 + 3 * KEY_SIZE, previousEncryptedKey, KEY_SIZE);
     }
     InternalFS.remove(STATE_FILENAME);
-    File file(STATE_FILENAME, FILE_O_WRITE, InternalFS);
+    File file(InternalFS);
+    file.open(STATE_FILENAME, FILE_O_WRITE);
     file.write(buffer, BUFFER_SIZE);
     file.flush();
     file.close();
@@ -251,7 +254,8 @@ bool HSM::eraseKeys() {
     Serial.println("Erasing the state file...");
     memset(buffer, 0x00, BUFFER_SIZE);
     InternalFS.remove(STATE_FILENAME);
-    File file(STATE_FILENAME, FILE_O_WRITE, InternalFS);
+    File file(InternalFS);
+    file.open(STATE_FILENAME, FILE_O_WRITE);
     file.write(buffer, BUFFER_SIZE);
     file.flush();
     file.close();
