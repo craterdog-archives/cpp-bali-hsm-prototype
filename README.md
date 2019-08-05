@@ -115,7 +115,7 @@ This request type tells the feather board to generate a new public-private key p
 ```
  * **Request Type**: `0x01`
  * **Number of Arguments**: `0x01`
- * **Size of Argument 1**: `0x0020`
+ * **Size of Argument 1**: `0x0020` (2 bytes)
  * **Argument 1**: `[a new random secret key of 32 bytes]`
 
 The response from this request type has one of the following forms:
@@ -129,9 +129,9 @@ This request type tells the feather board to save a copy of the existing public-
 ```
  * **Request Type**: `0x02`
  * **Number of Arguments**: `0x02`
- * **Size of Argument 1**: `0x0020`
+ * **Size of Argument 1**: `0x0020` (2 bytes)
  * **Argument 1**: `[the existing secret key of 32 bytes]`
- * **Size of Argument 2**: `0x0020`
+ * **Size of Argument 2**: `0x0020` (2 bytes)
  * **Argument 2**: `[a new random secret key of 32 bytes]`
 
 The response from this request type has one of the following forms:
@@ -157,7 +157,7 @@ This request type tells the feather board to generate a SHA512 digest of a byte 
 ```
  * **Request Type**: `0x04`
  * **Number of Arguments**: `0x01`
- * **Size of Argument 1**: `0xnnnn`
+ * **Size of Argument 1**: `0xnnnn` (2 bytes)
  * **Argument 1**: `[a byte array of N bytes]`
 
 The response from this request type has one of the following forms:
@@ -171,9 +171,9 @@ This request type tells the feather board to digitally sign a byte array using t
 ```
  * **Request Type**: `0x05`
  * **Number of Arguments**: `0x02`
- * **Size of Argument 1**: `0x0020`
+ * **Size of Argument 1**: `0x0020` (2 bytes)
  * **Argument 1**: `[the previous or current secret key of 32 bytes]`
- * **Size of Argument 2**: `0xnnnn`
+ * **Size of Argument 2**: `0xnnnn` (2 bytes)
  * **Argument 2**: `[a byte array of N bytes]`
 
 The response from this request type has one of the following forms:
@@ -187,11 +187,11 @@ This request type tells the feather board to determine whether or not a digital 
 ```
  * **Request Type**: `0x06`
  * **Number of Arguments**: `0x03`
- * **Size of Argument 3**: `0x0020`
+ * **Size of Argument 3**: `0x0020` (2 bytes)
  * **Argument 1**: `[a public key of 32 bytes]`
- * **Size of Argument 2**: `0x0040`
+ * **Size of Argument 2**: `0x0040` (2 bytes)
  * **Argument 2**: `[a digital signature of 64 bytes]`
- * **Size of Argument 1**: `0xnnnn`
+ * **Size of Argument 1**: `0xnnnn` (2 bytes)
  * **Argument 3**: `[a byte array of N bytes]`
 
 The response from this request type has one of the following forms:
