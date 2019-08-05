@@ -7,7 +7,6 @@
 #include <InternalFileSystem.h>
 #include <SHA512.h>
 #include <Ed25519.h>
-#include <Codex.h>
 #include "HSM.h"
 
 #define STATE_DIRECTORY    "/cdt"
@@ -90,8 +89,6 @@ void HSM::loadState() {
         File file(STATE_FILENAME, FILE_O_READ, InternalFS);
         file.read(buffer, BUFFER_SIZE);
         file.close();
-        Serial.print("STATE: ");
-        Serial.println(Codex::encode(buffer, BUFFER_SIZE));
         switch (buffer[0]) {
             case 0:
                 Serial.println("No keys have been created.");
@@ -148,8 +145,6 @@ void HSM::storeState() {
     file.write(buffer, BUFFER_SIZE);
     file.flush();
     file.close();
-    Serial.print("STATE: ");
-    Serial.println(Codex::encode(buffer, BUFFER_SIZE));
 }
 
 
