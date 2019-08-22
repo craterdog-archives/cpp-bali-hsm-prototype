@@ -153,23 +153,18 @@ void HSM::storeState() {
 
 // NOTE: The returned public key must be deleted by the calling program.
 const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE]) {
-    uint8_t* privateKey = new uint8_t[KEY_SIZE];
 
-    // handle any previous keys
-    if (previousPublicKey) {
-        Serial.println("A previous key pair already exists, rolling it back to the current key pair...");
-        // roll-back the previous regeneration attempt
-        memcpy(publicKey, previousPublicKey, KEY_SIZE);
-        memcpy(encryptedKey, previousEncryptedKey, KEY_SIZE);
-        erase(previousPublicKey, KEY_SIZE);
-        erase(previousEncryptedKey, KEY_SIZE);
-        storeState();
+    // handle any existing keys
+    if (publicKey) {
+        Serial.println("A key pair already exists.");
+        return 0;  // TODO: analyze as possible side channel
     }
 
     // generate a new key pair
     Serial.println("Generating a new key pair...");
     publicKey = new uint8_t[KEY_SIZE];
     encryptedKey = new uint8_t[KEY_SIZE];
+    uint8_t* privateKey = new uint8_t[KEY_SIZE];
     Ed25519::generatePrivateKey(privateKey);
     Ed25519::derivePublicKey(publicKey, privateKey);
 
@@ -189,7 +184,6 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE]) {
 
 // NOTE: The returned public key must be deleted by the calling program.
 const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newSecretKey[KEY_SIZE]) {
-    uint8_t* privateKey = new uint8_t[KEY_SIZE];
 
     // handle any previous keys
     if (previousPublicKey) {
@@ -204,6 +198,7 @@ const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newS
 
     // handle existing keys
     Serial.println("Extracting the existing private key...");
+    uint8_t* privateKey = new uint8_t[KEY_SIZE];
     XOR(existingSecretKey, encryptedKey, privateKey);
 
     // validate the private key
@@ -218,15 +213,11 @@ const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newS
     Serial.println("Saving the previous key pair...");
     previousPublicKey = new uint8_t[KEY_SIZE];
     memcpy(previousPublicKey, publicKey, KEY_SIZE);
-    erase(publicKey, KEY_SIZE);
     previousEncryptedKey = new uint8_t[KEY_SIZE];
     memcpy(previousEncryptedKey, encryptedKey, KEY_SIZE);
-    erase(encryptedKey, KEY_SIZE);
 
     // generate a new key pair
     Serial.println("Generating a new key pair...");
-    publicKey = new uint8_t[KEY_SIZE];
-    encryptedKey = new uint8_t[KEY_SIZE];
     Ed25519::generatePrivateKey(privateKey);
     Ed25519::derivePublicKey(publicKey, privateKey);
 

@@ -345,8 +345,10 @@ void requestCallback(uint16_t connectionHandle) {
                 memset(secretKey, 0x00, KEY_SIZE);
                 if (signature) {
                     success = true;
+                    const char* encoded = Codex::encode(signature, SIG_SIZE);
                     Serial.print("Signature: ");
-                    Serial.println(Codex::encode(signature, SIG_SIZE));
+                    Serial.println(encoded);
+                    delete [] encoded;
                     writeResult(signature, SIG_SIZE);
                     delete [] signature;
                     updateState();
@@ -398,19 +400,6 @@ void notifyCallback(uint16_t connectionHandle, bool enabled) {
     Serial.print(enabled ? "enabled" : "disabled");
     Serial.println(".");
     */
-}
-
-
-/*
- * This function generates a new byte array containing the specified number of
- * random bytes.
- */
-uint8_t* randomBytes(size_t length) {
-    uint8_t* bytes = new uint8_t[length];
-    for (size_t i = 0; i < length; i++) {
-        bytes[i] = (uint8_t) random(256);
-    }
-    return bytes;
 }
 
 
