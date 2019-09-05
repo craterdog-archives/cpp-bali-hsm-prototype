@@ -14,6 +14,13 @@
 using namespace Adafruit_LittleFS_Namespace;
 
 
+// CONSTANTS
+
+const int LED = 17;  // pin number of the LED
+const int BUTTON = A3;  // pin number of the push button
+const int MAX_WAIT_MILLISECONDS = 5000;  // 5 seconds
+
+
 // PRIVATE FREE FUNCTIONS
 
 /*
@@ -61,9 +68,32 @@ bool invalidKeyPair(
 }
 
 
+bool rejected() {
+    int milliseconds = 0;
+    digitalWrite(LED, HIGH);
+    while (milliseconds < MAX_WAIT_MILLISECONDS) {
+        delay(100);
+        milliseconds += 100;
+        int buttonState = digitalRead(BUTTON);
+        if (buttonState == LOW) {
+            digitalWrite(LED, LOW);
+            return false;  // approved
+        }
+    }
+    return true;  // rejected
+}
+
+
 // PUBLIC MEMBER FUNCTIONS
 
-HSM::HSM() {
+HSM::HSM(const bool hasButton) {
+    if (hasButton) {
+        Serial.println("Initializing the button and LED...");
+        this->hasButton = hasButton;
+        pinMode(BUTTON, INPUT_PULLUP);
+        pinMode(LED, OUTPUT);
+        digitalWrite(LED, LOW);
+    }
     Serial.println("Loading the state of the HSM...");
     InternalFS.begin();
     loadState();
@@ -160,6 +190,12 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE]) {
         return 0;  // TODO: analyze as possible side channel
     }
 
+    // get user approval (if enabled)
+    if (rejected()) {
+        Serial.println("The user did not approve the new key generation.");
+        return 0;  // TODO: analyze as possible side channel
+    }
+
     // generate a new key pair
     Serial.println("Generating a new key pair...");
     publicKey = new uint8_t[KEY_SIZE];
@@ -194,6 +230,12 @@ const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newS
         erase(previousPublicKey, KEY_SIZE);
         erase(previousEncryptedKey, KEY_SIZE);
         storeState();
+    }
+
+    // get user approval (if enabled)
+    if (rejected()) {
+        Serial.println("The user did not approve the key rotation.");
+        return 0;  // TODO: analyze as possible side channel
     }
 
     // handle existing keys
@@ -271,9 +313,15 @@ const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes,
         Serial.println("No key has been generated yet.");
         return 0;
     }
+
+    // get user approval (if enabled)
+    if (rejected()) {
+        Serial.println("The user did not approve the digital signing.");
+        return 0;  // TODO: analyze as possible side channel
+    }
+
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
     uint8_t* signature = new uint8_t[SIG_SIZE];
-
     if (previousPublicKey) {
 
         // decrypt the private key

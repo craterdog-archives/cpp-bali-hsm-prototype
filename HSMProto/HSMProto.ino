@@ -40,6 +40,7 @@ void initConsole() {
  * and implements all the required public-private cryptographic functions.
  */
 HSM* hsm;
+bool hasButton = true;
 
 
 /*
@@ -47,7 +48,7 @@ HSM* hsm;
  */
 void initHSM() {
     Serial.println("Initializing the hardware security module (HSM)...");
-    hsm = new HSM();
+    hsm = new HSM(hasButton);
     Serial.println("Done.");
     Serial.println("");
 }
