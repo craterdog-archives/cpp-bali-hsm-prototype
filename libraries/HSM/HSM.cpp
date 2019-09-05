@@ -17,8 +17,9 @@ using namespace Adafruit_LittleFS_Namespace;
 // CONSTANTS
 
 const int LED = 17;  // pin number of the LED
-const int BUTTON = A3;  // pin number of the push button
-const int MAX_WAIT_MILLISECONDS = 5000;  // 5 seconds
+const int BUTTON = 5;  // pin number of the push button (other pin is ground)
+const int WAIT_MILLISECONDS = 50;
+const int MAX_WAIT_MILLISECONDS = 5 /*seconds*/ * 1000;
 
 
 // PRIVATE FREE FUNCTIONS
@@ -70,13 +71,11 @@ bool invalidKeyPair(
 
 bool rejected() {
     int milliseconds = 0;
-    digitalWrite(LED, HIGH);
     while (milliseconds < MAX_WAIT_MILLISECONDS) {
-        delay(100);
-        milliseconds += 100;
+        delay(WAIT_MILLISECONDS);
+        milliseconds += WAIT_MILLISECONDS;
         int buttonState = digitalRead(BUTTON);
         if (buttonState == LOW) {
-            digitalWrite(LED, LOW);
             return false;  // approved
         }
     }
@@ -191,8 +190,10 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE]) {
     }
 
     // get user approval (if enabled)
+    digitalWrite(LED, HIGH);
     if (rejected()) {
         Serial.println("The user did not approve the new key generation.");
+        digitalWrite(LED, LOW);
         return 0;  // TODO: analyze as possible side channel
     }
 
@@ -209,6 +210,7 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE]) {
     XOR(newSecretKey, privateKey, encryptedKey);
     erase(privateKey, KEY_SIZE);
     storeState();
+    digitalWrite(LED, LOW);
 
     // return a copy of the public key
     Serial.println("Returning the new public key...");
@@ -233,8 +235,10 @@ const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newS
     }
 
     // get user approval (if enabled)
+    digitalWrite(LED, HIGH);
     if (rejected()) {
         Serial.println("The user did not approve the key rotation.");
+        digitalWrite(LED, LOW);
         return 0;  // TODO: analyze as possible side channel
     }
 
@@ -248,6 +252,7 @@ const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newS
         Serial.println("An invalid existing secret key was passed by the mobile device.");
         // clean up and bail
         erase(privateKey, KEY_SIZE);
+        digitalWrite(LED, LOW);
         return 0;  // TODO: analyze as possible side channel
     }
 
@@ -268,6 +273,7 @@ const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newS
     XOR(newSecretKey, privateKey, encryptedKey);
     erase(privateKey, KEY_SIZE);
     storeState();
+    digitalWrite(LED, LOW);
 
     // return a copy of the public key
     Serial.println("Returning the new public key...");
@@ -315,8 +321,10 @@ const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes,
     }
 
     // get user approval (if enabled)
+    digitalWrite(LED, HIGH);
     if (rejected()) {
         Serial.println("The user did not approve the digital signing.");
+        digitalWrite(LED, LOW);
         return 0;  // TODO: analyze as possible side channel
     }
 
@@ -331,6 +339,7 @@ const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes,
         if (invalidKeyPair(previousPublicKey, privateKey)) {
             Serial.println("An invalid previous secret key was passed by the mobile device.");
             erase(privateKey, KEY_SIZE);
+            digitalWrite(LED, LOW);
             return 0;  // TODO: analyze as possible side channel
         }
 
@@ -355,6 +364,7 @@ const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes,
         if (invalidKeyPair(publicKey, privateKey)) {
             Serial.println("An invalid secret key was passed by the mobile device.");
             erase(privateKey, KEY_SIZE);
+            digitalWrite(LED, LOW);
             return 0;  // TODO: analyze as possible side channel
         }
 
@@ -366,6 +376,7 @@ const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes,
         erase(privateKey, KEY_SIZE);
 
     }
+    digitalWrite(LED, LOW);
 
     // return the digital signature
     return signature;
