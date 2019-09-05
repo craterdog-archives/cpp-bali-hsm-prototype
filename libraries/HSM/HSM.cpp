@@ -85,17 +85,22 @@ bool rejected() {
 
 // PUBLIC MEMBER FUNCTIONS
 
-HSM::HSM(const bool hasButton) {
-    if (hasButton) {
-        Serial.println("Initializing the button and LED...");
-        this->hasButton = hasButton;
-        pinMode(BUTTON, INPUT_PULLUP);
-        pinMode(LED, OUTPUT);
-        digitalWrite(LED, LOW);
-    }
+HSM::HSM() {
     Serial.println("Loading the state of the HSM...");
+    pinMode(LED, OUTPUT);
+    digitalWrite(LED, HIGH);
+    pinMode(BUTTON, INPUT_PULLUP);
+    if (rejected()) {
+        Serial.println("The button is disabled.");
+        pinMode(BUTTON, OUTPUT);
+        this->hasButton = false;
+    } else {
+        Serial.println("The button is enabled.");
+        this->hasButton = true;
+    }
     InternalFS.begin();
     loadState();
+    digitalWrite(LED, LOW);
 }
 
 
@@ -189,10 +194,10 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE]) {
         return 0;  // TODO: analyze as possible side channel
     }
 
-    // get user approval (if enabled)
+    // get user approval (if button enabled)
     digitalWrite(LED, HIGH);
-    if (rejected()) {
-        Serial.println("The user did not approve the new key generation.");
+    if (hasButton && rejected()) {
+        Serial.println("The generate keys request was rejected by the user.");
         digitalWrite(LED, LOW);
         return 0;  // TODO: analyze as possible side channel
     }
@@ -234,10 +239,10 @@ const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newS
         storeState();
     }
 
-    // get user approval (if enabled)
+    // get user approval (if button enabled)
     digitalWrite(LED, HIGH);
-    if (rejected()) {
-        Serial.println("The user did not approve the key rotation.");
+    if (hasButton && rejected()) {
+        Serial.println("The rotate keys request was rejected by the user.");
         digitalWrite(LED, LOW);
         return 0;  // TODO: analyze as possible side channel
     }
@@ -320,10 +325,10 @@ const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes,
         return 0;
     }
 
-    // get user approval (if enabled)
+    // get user approval (if button enabled)
     digitalWrite(LED, HIGH);
-    if (rejected()) {
-        Serial.println("The user did not approve the digital signing.");
+    if (hasButton && rejected()) {
+        Serial.println("The sign bytes request was rejected by the user.");
         digitalWrite(LED, LOW);
         return 0;  // TODO: analyze as possible side channel
     }

@@ -78,11 +78,9 @@ class HSM final {
 
   public:
     /**
-     * This constructor "rehydrates" a hardware security module (HSM) on power up. If
-     * the 'hasButton' argument is true, the HSM will wait for approval from the user
-     * each time the private key is generated or needed for signing.
+     * This constructor "rehydrates" a hardware security module (HSM) on power up.
      */
-    HSM(const bool hasButton);
+    HSM();
 
     /**
      * This destructor "dehydrates" a hardware security module (HSM) on power down. It
