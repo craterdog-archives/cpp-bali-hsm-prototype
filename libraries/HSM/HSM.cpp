@@ -8,6 +8,7 @@
 #include <SHA512.h>
 #include <Ed25519.h>
 #include "HSM.h"
+#include "Codex.h"
 
 #define STATE_DIRECTORY    "/cdt"
 #define STATE_FILENAME    "/cdt/state"
@@ -86,7 +87,7 @@ bool rejected() {
 // PUBLIC MEMBER FUNCTIONS
 
 HSM::HSM() {
-    Serial.println("Loading the state of the HSM...");
+    Serial.println("Checking for a button...");
     pinMode(LED, OUTPUT);
     digitalWrite(LED, HIGH);
     pinMode(BUTTON, INPUT_PULLUP);
@@ -98,6 +99,7 @@ HSM::HSM() {
         Serial.println("The button is enabled.");
         this->hasButton = true;
     }
+    Serial.println("Loading the state of the HSM...");
     InternalFS.begin();
     loadState();
     digitalWrite(LED, LOW);
@@ -124,6 +126,7 @@ void HSM::loadState() {
         file.open(STATE_FILENAME, FILE_O_READ);
         file.read(buffer, BUFFER_SIZE);
         file.close();
+        char* encoded;
         switch (buffer[0]) {
             case 0:
                 Serial.println("No keys have been created.");
@@ -134,6 +137,10 @@ void HSM::loadState() {
                 memcpy(publicKey, buffer + 1, KEY_SIZE);
                 encryptedKey = new uint8_t[KEY_SIZE];
                 memcpy(encryptedKey, buffer + 1 + KEY_SIZE, KEY_SIZE);
+                encoded = Codex::encode(encryptedKey, KEY_SIZE);
+                Serial.print("Encrypted Key: ");
+                Serial.println(encoded);
+                delete [] encoded;
                 break;
             case 2:
                 Serial.println("Loading the current keys...");
@@ -141,11 +148,19 @@ void HSM::loadState() {
                 memcpy(publicKey, buffer + 1, KEY_SIZE);
                 encryptedKey = new uint8_t[KEY_SIZE];
                 memcpy(encryptedKey, buffer + 1 + KEY_SIZE, KEY_SIZE);
+                encoded = Codex::encode(encryptedKey, KEY_SIZE);
+                Serial.print("Encrypted Key: ");
+                Serial.println(encoded);
+                delete [] encoded;
                 Serial.println("Loading the previous keys...");
                 previousPublicKey = new uint8_t[KEY_SIZE];
                 memcpy(previousPublicKey, buffer + 1 + 2 * KEY_SIZE, KEY_SIZE);
                 previousEncryptedKey = new uint8_t[KEY_SIZE];
                 memcpy(previousEncryptedKey, buffer + 1 + 3 * KEY_SIZE, KEY_SIZE);
+                encoded = Codex::encode(previousEncryptedKey, KEY_SIZE);
+                Serial.print("Previous Encrypted Key: ");
+                Serial.println(encoded);
+                delete [] encoded;
                 break;
         }
     } else {
@@ -169,12 +184,20 @@ void HSM::storeState() {
         buffer[0]++;
         memcpy(buffer + 1, publicKey, KEY_SIZE);
         memcpy(buffer + 1 + KEY_SIZE, encryptedKey, KEY_SIZE);
+        const char* encoded = Codex::encode(encryptedKey, KEY_SIZE);
+        Serial.print("Encrypted Key: ");
+        Serial.println(encoded);
+        delete [] encoded;
     }
     if (previousPublicKey) {
         Serial.println("Saving the previous keys...");
         buffer[0]++;
         memcpy(buffer + 1 + 2 * KEY_SIZE, previousPublicKey, KEY_SIZE);
         memcpy(buffer + 1 + 3 * KEY_SIZE, previousEncryptedKey, KEY_SIZE);
+        const char* encoded = Codex::encode(previousEncryptedKey, KEY_SIZE);
+        Serial.print("Previous Encrypted Key: ");
+        Serial.println(encoded);
+        delete [] encoded;
     }
     InternalFS.remove(STATE_FILENAME);
     File file(InternalFS);
@@ -182,6 +205,7 @@ void HSM::storeState() {
     file.write(buffer, BUFFER_SIZE);
     file.flush();
     file.close();
+    Serial.println("Done.");
 }
 
 

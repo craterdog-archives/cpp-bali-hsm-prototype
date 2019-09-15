@@ -29,8 +29,8 @@ void loop(void) {
 void initConsole() {
     Serial.begin(115200);
     while (!Serial) delay(10);
-    Serial.println("The ButtonUp™ Console");
-    Serial.println("---------------------");
+    Serial.println("The ArmorD™ Console");
+    Serial.println("-------------------");
     Serial.println("");
 }
 
@@ -79,15 +79,15 @@ void initBluetooth() {
     Bluefruit.setTxPower(-20);
 
     // The name will be displayed in the mobile app
-    Bluefruit.setName("ButtonUp™");
+    Bluefruit.setName("ArmorD");
 
     // Add callbacks for important events
     Bluefruit.Periph.setConnectCallback(connectCallback);
     Bluefruit.Periph.setDisconnectCallback(disconnectCallback);
 
     // Configure and start the Device Information Service
-    bledis.setManufacturer("Adafruit Industries");
-    bledis.setModel("Bluefruit Feather nRF52");
+    bledis.setManufacturer("Crater Dog Technologies");
+    bledis.setModel("v1");
     bledis.begin();
   
     // Configure and start UART Communication Service
@@ -445,14 +445,18 @@ bool readRequest() {
             arguments[i].length = numberOfBytes;
             index += numberOfBytes;
         }
+        /*
         if (requestSize > BUFFER_SIZE || requestSize != index) {
-            Serial.print("Invalid request length: ");
+            Serial.print("Invalid request type: ");
+            Serial.println(requestType);
+            Serial.print("Request length: ");
             Serial.println(requestSize);
             Serial.print("Expected: ");
             Serial.println(index);
             requestSize = 0;
             return false;
         }
+        */
         requestSize = 0;
     }
     if (requestSize > BUFFER_SIZE) {
