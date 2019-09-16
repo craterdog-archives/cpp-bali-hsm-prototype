@@ -11,6 +11,19 @@
 #define DIG_SIZE 64  // digest size in bytes
 #define SIG_SIZE 64  // digital signature size in bytes
 
+
+// STATE MACHINE
+
+enum State {
+    invalid = 0,
+    noKeyPairs = 1,
+    oneKeyPair = 2,
+    twoKeyPairs = 3
+};
+
+
+// CLASS DEFINITION
+
 /**
  * This class implements a hardware security module (HSM) and is designed to run on a
  * hardened processor that is tamper resistant and shielded from EMF monitoring. The
@@ -87,18 +100,6 @@ class HSM final {
      * erases the keys from the processor memory and stops processing requests.
      */
    ~HSM();
-
-   /**
-    * This function loads any persisted key state from the flash memory based file
-    * system.
-    */
-    void loadState();
-
-   /**
-    * This function stores any persisted key state to the flash memory based file
-    * system.
-    */
-    void storeState();
 
     /**
      * This function is passed, from a mobile device, a new secret key. It generates a
@@ -179,8 +180,21 @@ class HSM final {
     );
 
   private:
+   /**
+    * This function loads any persisted key state from the flash memory based file
+    * system.
+    */
+    void loadState();
+
+   /**
+    * This function stores any persisted key state to the flash memory based file
+    * system.
+    */
+    void storeState();
+
     static const size_t BUFFER_SIZE = 4 * KEY_SIZE + 1;
     uint8_t buffer[BUFFER_SIZE] = { 0 };
+    State currentState = invalid;
     uint8_t* publicKey = 0;
     uint8_t* encryptedKey = 0;
     uint8_t* previousPublicKey = 0;

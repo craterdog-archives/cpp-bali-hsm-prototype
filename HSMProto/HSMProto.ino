@@ -153,35 +153,6 @@ size_t requestSize = 0;
 
 
 /*
- * This enumeration defines the possible states the HSM can be in.
- */
-enum State {
-    invalid = 0,
-    noKeyPairs = 1,
-    oneKeyPair = 2,
-    twoKeyPairs = 3
-};
-
-State currentState = noKeyPairs;
-
-State nextState[4][7] = {
-   // loadBlock   generateKeys  rotateKeys   eraseKeys  digestBytes  signBytes   validBytes
-    { invalid,     invalid,     invalid,     invalid,    invalid,    invalid,    invalid,   }, // invalid
-    { noKeyPairs,  oneKeyPair,  invalid,     noKeyPairs, noKeyPairs, invalid,    noKeyPairs }, // noKeyPairs
-    { oneKeyPair,  invalid,     twoKeyPairs, noKeyPairs, oneKeyPair, oneKeyPair, oneKeyPair }, // oneKeyPair
-    { twoKeyPairs, invalid,     invalid,     noKeyPairs, invalid,    oneKeyPair, invalid }     // twoKeyPairs
-};
-
-bool validState() {
-    return nextState[currentState][requestType] > 0;
-};
-
-void updateState() {
-    currentState = nextState[currentState][requestType];
-};
-
-
-/*
  * The request buffer is used to hold all of the information associated with one
  * or more requests that are received from a paired mobile device. For efficiency,
  * the arguments are referenced inline in the buffer rather than being copied into
@@ -247,7 +218,7 @@ void requestCallback(uint16_t connectionHandle) {
         case generateKeys: {
             Serial.println("Generate Keys");
             bool success = false;
-            if (validState() && arguments[0].length == KEY_SIZE) {
+            if (arguments[0].length == KEY_SIZE) {
                 uint8_t* newSecretKey = arguments[0].pointer;
                 const uint8_t* publicKey = hsm->generateKeys(newSecretKey);
                 memset(newSecretKey, 0x00, KEY_SIZE);
@@ -259,7 +230,6 @@ void requestCallback(uint16_t connectionHandle) {
                     delete [] encoded;
                     writeResult(publicKey, KEY_SIZE);
                     delete [] publicKey;
-                    updateState();
                 }
             }
             if (!success) writeError();
@@ -271,7 +241,7 @@ void requestCallback(uint16_t connectionHandle) {
         case rotateKeys: {
             Serial.println("Rotate Keys");
             bool success = false;
-            if (validState() && arguments[0].length == KEY_SIZE && arguments[1].length == KEY_SIZE) {
+            if (arguments[0].length == KEY_SIZE && arguments[1].length == KEY_SIZE) {
                 uint8_t* existingSecretKey = arguments[0].pointer;
                 uint8_t* newSecretKey = arguments[1].pointer;
                 const uint8_t* publicKey = hsm->rotateKeys(existingSecretKey, newSecretKey);
@@ -285,7 +255,6 @@ void requestCallback(uint16_t connectionHandle) {
                     delete [] encoded;
                     writeResult(publicKey, KEY_SIZE);
                     delete [] publicKey;
-                    updateState();
                 }
             }
             if (!success) writeError();
@@ -297,12 +266,9 @@ void requestCallback(uint16_t connectionHandle) {
         case eraseKeys: {
             Serial.println("Erase Keys");
             bool success = false;
-            if (validState()) {
-                if (hsm->eraseKeys()) {
-                    success = true;
-                    writeResult(success);
-                    updateState();
-                }
+            if (hsm->eraseKeys()) {
+                success = true;
+                writeResult(success);
             }
             if (!success) writeError();
             Serial.println(success ? "Succeeded" : "Failed");
@@ -313,20 +279,17 @@ void requestCallback(uint16_t connectionHandle) {
         case digestBytes: {
             Serial.println("Digest Bytes");
             bool success = false;
-            if (validState()) {
-                const uint8_t* bytes = arguments[0].pointer;
-                const size_t size = arguments[0].length;
-                const uint8_t* digest = hsm->digestBytes(bytes, size);
-                if (digest) {
-                    const char* encoded = Codex::encode(digest, DIG_SIZE);
-                    Serial.print("Bytes Digest: ");
-                    Serial.println(encoded);
-                    delete [] encoded;
-                    success = true;
-                    writeResult(digest, DIG_SIZE);
-                    delete [] digest;
-                    updateState();
-                }
+            const uint8_t* bytes = arguments[0].pointer;
+            const size_t size = arguments[0].length;
+            const uint8_t* digest = hsm->digestBytes(bytes, size);
+            if (digest) {
+                const char* encoded = Codex::encode(digest, DIG_SIZE);
+                Serial.print("Bytes Digest: ");
+                Serial.println(encoded);
+                delete [] encoded;
+                success = true;
+                writeResult(digest, DIG_SIZE);
+                delete [] digest;
             }
             if (!success) writeError();
             Serial.println(success ? "Succeeded" : "Failed");
@@ -337,7 +300,7 @@ void requestCallback(uint16_t connectionHandle) {
         case signBytes: {
             Serial.println("Sign Bytes");
             bool success = false;
-            if (validState() && arguments[0].length == KEY_SIZE) {
+            if (arguments[0].length == KEY_SIZE) {
                 uint8_t* secretKey = arguments[0].pointer;
                 const uint8_t* bytes = arguments[1].pointer;
                 const size_t size = arguments[1].length;
@@ -351,7 +314,6 @@ void requestCallback(uint16_t connectionHandle) {
                     delete [] encoded;
                     writeResult(signature, SIG_SIZE);
                     delete [] signature;
-                    updateState();
                 }
             }
             if (!success) writeError();
@@ -363,14 +325,13 @@ void requestCallback(uint16_t connectionHandle) {
         case validSignature: {
             Serial.println("Valid Signature?");
             bool success = false;
-            if (validState() && arguments[0].length == KEY_SIZE && arguments[1].length == SIG_SIZE) {
+            if (arguments[0].length == KEY_SIZE && arguments[1].length == SIG_SIZE) {
                 uint8_t* aPublicKey = arguments[0].pointer;
                 uint8_t* signature = arguments[1].pointer;
                 const uint8_t* bytes = arguments[2].pointer;
                 const size_t size = arguments[2].length;
                 success = hsm->validSignature(aPublicKey, signature, bytes, size);
                 writeResult(success);
-                updateState();
             }
             if (!success) writeError();
             Serial.println(success ? "Succeeded" : "Failed");
