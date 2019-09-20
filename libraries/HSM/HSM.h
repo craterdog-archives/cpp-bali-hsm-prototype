@@ -15,10 +15,20 @@
 // STATE MACHINE
 
 enum State {
-    invalid = 0,
-    noKeyPairs = 1,
-    oneKeyPair = 2,
-    twoKeyPairs = 3
+    Invalid = 0,
+    NoKeyPairs = 1,
+    OneKeyPair = 2,
+    TwoKeyPairs = 3
+};
+
+enum RequestType {
+    LoadBlock = 0,
+    GenerateKeys = 1,
+    RotateKeys = 2,
+    EraseKeys = 3,
+    DigestBytes = 4,
+    SignBytes = 5,
+    ValidSignature = 6
 };
 
 
@@ -180,27 +190,40 @@ class HSM final {
     );
 
   private:
-   /**
-    * This function loads any persisted key state from the flash memory based file
-    * system.
-    */
-    void loadState();
+    static const size_t BUFFER_SIZE = 4 * KEY_SIZE + 1;
 
-   /**
-    * This function stores any persisted key state to the flash memory based file
-    * system.
-    */
+    /**
+     * This function checks to see if the specified request is allowed in the current
+     * state.
+     */
+    bool validRequest(RequestType request);
+
+    /**
+     * This function transitions the HSM to the next state based on the specified
+     * request.
+     */
+    void transitionState(RequestType request);
+
+    State currentState = Invalid;
+
+    /**
+     * This function stores any persisted key state to the flash memory based file
+     * system.
+     */
     void storeState();
 
-    static const size_t BUFFER_SIZE = 4 * KEY_SIZE + 1;
+    /**
+     * This function loads any persisted key state from the flash memory based file
+     * system.
+     */
+    void loadState();
+
     uint8_t buffer[BUFFER_SIZE] = { 0 };
-    State currentState = invalid;
     uint8_t* publicKey = 0;
     uint8_t* encryptedKey = 0;
     uint8_t* previousPublicKey = 0;
     uint8_t* previousEncryptedKey = 0;
     bool hasButton = false;
-    bool approved = false;
 
 };
 

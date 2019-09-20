@@ -134,20 +134,7 @@ void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
 }
 
 
-/*
- * This enumeration defines the possible request types the HSM can receive.
- */
-enum RequestType {
-    loadBlock = 0x00,
-    generateKeys = 0x01,
-    rotateKeys = 0x02,
-    eraseKeys = 0x03,
-    digestBytes = 0x04,
-    signBytes = 0x05,
-    validSignature = 0x06
-};
-
-RequestType requestType = loadBlock;
+RequestType requestType = LoadBlock;
 
 size_t requestSize = 0;
 
@@ -158,7 +145,7 @@ size_t requestSize = 0;
  * the arguments are referenced inline in the buffer rather than being copied into
  * their own memory.
  */
-const int BUFFER_SIZE = 20000;
+const int BUFFER_SIZE = 10000;
 uint8_t buffer[BUFFER_SIZE];
 
 
@@ -207,7 +194,7 @@ void requestCallback(uint16_t connectionHandle) {
     Serial.print("Request: ");
 
     switch (requestType) {
-        case loadBlock: {
+        case LoadBlock: {
             Serial.println("Load Block");
             writeResult(true);
             Serial.println("Succeeded");
@@ -215,7 +202,7 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case generateKeys: {
+        case GenerateKeys: {
             Serial.println("Generate Keys");
             bool success = false;
             if (arguments[0].length == KEY_SIZE) {
@@ -238,7 +225,7 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case rotateKeys: {
+        case RotateKeys: {
             Serial.println("Rotate Keys");
             bool success = false;
             if (arguments[0].length == KEY_SIZE && arguments[1].length == KEY_SIZE) {
@@ -263,7 +250,7 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case eraseKeys: {
+        case EraseKeys: {
             Serial.println("Erase Keys");
             bool success = false;
             if (hsm->eraseKeys()) {
@@ -276,7 +263,7 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case digestBytes: {
+        case DigestBytes: {
             Serial.println("Digest Bytes");
             bool success = false;
             const uint8_t* bytes = arguments[0].pointer;
@@ -297,7 +284,7 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case signBytes: {
+        case SignBytes: {
             Serial.println("Sign Bytes");
             bool success = false;
             if (arguments[0].length == KEY_SIZE) {
@@ -322,7 +309,7 @@ void requestCallback(uint16_t connectionHandle) {
             break;
         }
 
-        case validSignature: {
+        case ValidSignature: {
             Serial.println("Valid Signature?");
             bool success = false;
             if (arguments[0].length == KEY_SIZE && arguments[1].length == SIG_SIZE) {
@@ -387,7 +374,7 @@ bool readRequest() {
 
     // Read in the request information
     requestType = (RequestType) bleuart.read();
-    if (requestType == 0) {
+    if (requestType == LoadBlock) {
         // It's an extended sized request so load in one block of it
         uint8_t blockNumber = bleuart.read();
         Serial.print("Block number: ");
