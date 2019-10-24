@@ -1,5 +1,12 @@
 /************************************************************************
  * Copyright (c) Crater Dog Technologies(TM).  All Rights Reserved.     *
+ ************************************************************************
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.        *
+ *                                                                      *
+ * This source code is for reference purposes only.  It is protected by *
+ * US Patent 9,853,813 and any use of this source code will be deemed   *
+ * an infringment of the patent.  Crater Dog Technologies(TM) retains   *
+ * full ownership of this source code.                                  *
  ************************************************************************/
 #include <string.h>
 #include <Arduino.h>
