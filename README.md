@@ -1,6 +1,6 @@
 ![Logo](docs/images/CraterDogLogo.png)
 
-### Arduino Wearable Identity Prototype
+### Bali Nebula™ HSM Prototype
 This project provides a C++ implementation of a _hardware security module_ (HSM) that can be uploaded to an [Adafruit BLE nRF52 Feather Board](https://www.adafruit.com/product/3406). The code implements the peripheral side of the security protocol defined in the [Bali Digital Notary™](https://github.com/craterdog-bali/js-bali-digital-notary) project. Specifically, it can be used with the [HSM proxy module](https://github.com/craterdog-bali/js-bali-digital-notary/blob/master/src/v1/HSM.js) running on nodeJS.
 
 ### Getting Started
@@ -10,11 +10,11 @@ To get started with this project you should do the following:
  1. Configure the IDE by following [these instructions](https://learn.adafruit.com/adafruit-arduino-ide-setup/arduino-1-dot-6-x-ide).
  1. Clone this project on your computer by doing the following:
      ```
-     git clone https://github.com/derknorton/wearable-hsm-prototype.git
+     git clone https://github.com/derknorton/cpp-bali-hsm-prototype.git
      ```
  1. Open the Arduino IDE and load the _sketch_ that is in this folder of the project using the `File/Open...` menu:
      ```
-     ./wearable-hsm-prototype/HSMProto/HSMProto.ino
+     ./cpp-bali-hsm-prototype/HSMProto/HSMProto.ino
      ```
  1. Connect your feather board to your computer using a micro USB cable.
  1. Select the board type (Adafruit Bluefruit Feather nRF52832) from the `Tools/Board` menu.
@@ -22,6 +22,7 @@ To get started with this project you should do the following:
  1. The nRF52832 processor has an outdated bootloader. Select the "Bootloader DFU for the nRF52832" from the `Tools/Programmer` menu.
  1. Upload the new bootloader by selecting `Tools/Burn Bootloader` and then wait for it to finish.
  1. Then select the "Arduino as ISP" programmer from the `Tools/Programmer` menu.
+ 1. Add in the `cpp-bali-hsm-prototype/libraries/HSM/` directory as a library by selecting the `Sketch/Include Library/Add .ZIP Library` menu button.
  1. Click on the "check mark" button to compile the sketch, and then on the "right arrow" button to upload it to your board.
  1. When the code is done uploading, click on the "magnifying glass" button in the upper right corner to bring up the Serial Monitor. You should see it output something like the following:
      ```
