@@ -53,35 +53,35 @@ enum RequestType {
  *  * validSignature(bytes, size, signature, aPublicKey) => isValid?
  *
  * and the second group which do involve the private key which has been encrypted
- * using a secret key that is passed in from a mobile device:
- *  * generateKeys(secretKey) => publicKey
- *  * signBytes(secretKey, bytes, size) => signature
+ * using a mobile key that is passed in from a mobile device:
+ *  * generateKeys(mobileKey) => publicKey
+ *  * signBytes(mobileKey, bytes, size) => signature
  *  * eraseKeys() => success?
  *
- * The private key is encrypted using the secret key as follows:
- *    secretKey XOR privateKey => encryptedKey
+ * The private key is encrypted using the mobile key as follows:
+ *    mobileKey XOR privateKey => wearableKey
  *
- * The private key can then be decryped using the secret key as needed:
- *    secretKey XOR encryptedKey => privateKey
+ * The private key can then be decryped using the mobile key as needed:
+ *    mobileKey XOR wearableKey => privateKey
  *
- * Neither the secret key nor the private key are maintained in the HSM so the private
+ * Neither the mobile key nor the private key are maintained in the HSM so the private
  * key is completely secure.
  *
  * The process for signing bytes and verifying the resulting signatures requires
  * several steps:
  *  1  const uint8_t* bytes;  // the bytes to be signed
- *  2. const uint8_t* secretKey;  // stored on a mobile device
- *  3. const uint8_t* signature = hsm->signBytes(secretKey, bytes, size);
+ *  2. const uint8_t* mobileKey;  // stored on a mobile device
+ *  3. const uint8_t* signature = hsm->signBytes(mobileKey, bytes, size);
  *  4. bool isValid = hsm->validSignature(bytes, size, signature, aPublicKey);
  *
  * If the public key corresponds to the private key that signed the bytes then the
  * signature is valid.
  *
  * The process for generating new keys requires several steps:
- *  1. const uint8_t* secretKey = a new random byte array containing KEY_SIZE bytes
- *  2. const uint8_t* publicKey = hsm->generateKeys(secretKey);
+ *  1. const uint8_t* mobileKey = a new random byte array containing KEY_SIZE bytes
+ *  2. const uint8_t* publicKey = hsm->generateKeys(mobileKey);
  *  3. const char* certificate = construct a new certificate containing the public key
- *  4. const uint8_t* signature = hsm->signBytes(secretKey, certificate);
+ *  4. const uint8_t* signature = hsm->signBytes(mobileKey, certificate);
  *  5. const char* certificate = append the signature to the certificate;
  *  6. publish the signed certificate to the cloud for others to download
  *
@@ -91,13 +91,13 @@ enum RequestType {
  * so that no one else can use them.
  *
  * When regenerating keys, step two above has an extra argument that is passed:
- *  2. const uint8_t* publicKey = hsm->generateKeys(newSecretKey, existingSecretKey);
+ *  2. const uint8_t* publicKey = hsm->generateKeys(newMobileKey, existingMobileKey);
  *
  * This allows the HSM to decrypt and verify the existing private key before
- * replacing it with a new private key. It also saves off the existing encrypted
+ * replacing it with a new private key. It also saves off the existing wearable
  * key so that the existing private key can be used to sign the new certificate
  * in step four above:
- *  4. const uint8_t* signature = hsm->signBytes(existingSecretKey, certificate);
+ *  4. const uint8_t* signature = hsm->signBytes(existingMobileKey, certificate);
  *
  * Having each new certificate signed with the previous private key allows the
  * certificates to be managed on a key chain where each certificate is signed by the
@@ -119,31 +119,31 @@ class HSM final {
    ~HSM();
 
     /**
-     * This function is passed, from a mobile device, a new secret key. It generates a
-     * new public-private key pair and uses the new secret key to encrypt the new
-     * private key using the XOR operation to generate a new encrypted key. Then the
-     * new public key and the new encrypted key are saved, and the new secret key and
+     * This function is passed, from a mobile device, a new mobile key. It generates a
+     * new public-private key pair and uses the new mobile key to encrypt the new
+     * private key using the XOR operation to generate a new wearable key. Then the
+     * new public key and the new wearable key are saved, and the new mobile key and
      * new private key are erased from the HSM. The new public key is returned from
      * the function.
      *
      * It is the responsibilty of the calling program to 'delete []' the public key
      * once it has finished with it.
      */
-    const uint8_t* generateKeys(uint8_t newSecretKey[KEY_SIZE]);
+    const uint8_t* generateKeys(uint8_t newMobileKey[KEY_SIZE]);
 
     /**
-     * This function is passed, from a mobile device, an existing secret key and a
-     * new secret key. It saves the existing public and encrypted keys and then
-     * generates a new public-private key pair. It uses the new secret key to encrypt
-     * the new private key using the XOR operation to generate a new encrypted key.
-     * Then the new public key and the new encrypted key are saved, and the existing
-     * and new secret keys and the new private key are erased from the HSM. The new
+     * This function is passed, from a mobile device, an existing mobile key and a
+     * new mobile key. It saves the existing public and wearable keys and then
+     * generates a new public-private key pair. It uses the new mobile key to encrypt
+     * the new private key using the XOR operation to generate a new wearable key.
+     * Then the new public key and the new wearable key are saved, and the existing
+     * and new mobile keys and the new private key are erased from the HSM. The new
      * public key is returned from the function.
      *
      * It is the responsibilty of the calling program to 'delete []' the public key
      * once it has finished with it.
      */
-    const uint8_t* rotateKeys(uint8_t existingSecretKey[KEY_SIZE],uint8_t newSecretKey[KEY_SIZE]);
+    const uint8_t* rotateKeys(uint8_t existingMobileKey[KEY_SIZE],uint8_t newMobileKey[KEY_SIZE]);
 
     /**
      * This function erases from the processor memory all current and previous keys.
@@ -163,14 +163,14 @@ class HSM final {
     const uint8_t* digestBytes(const uint8_t* bytes, const size_t size);
 
     /**
-     * This function is passed, from a mobile device, a secret key and some bytes to
-     * be digitally signed. The secret key is used to reconstruct the private key using
-     * the encrypted key and verifying it with the public key. If the keys are valid,
-     * the private key is used to digitally sign the bytes and the secret key and
+     * This function is passed, from a mobile device, a mobile key and some bytes to
+     * be digitally signed. The mobile key is used to reconstruct the private key using
+     * the wearable key and verifying it with the public key. If the keys are valid,
+     * the private key is used to digitally sign the bytes and the mobile key and
      * the private key are erased from the HSM. The digital signature for the bytes
      * is returned from the function.
      *
-     * If there is a previous encrypted key, that key is used one last time and then erased
+     * If there is a previous wearable key, that key is used one last time and then erased
      * from the HSM. This is a special case that occurs only when the public certificate
      * for a new key is being signed by the previous private key to prove it belongs
      * on the same key chain.
@@ -178,7 +178,7 @@ class HSM final {
      * It is the responsibilty of the calling program to 'delete []' the signature
      * once it has finished with it.
      */
-    const uint8_t* signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes, const size_t size);
+    const uint8_t* signBytes(uint8_t mobileKey[KEY_SIZE], const uint8_t* bytes, const size_t size);
 
     /**
      * This function is passed, from a mobile device, some bytes, and a digital signature
@@ -227,9 +227,9 @@ class HSM final {
 
     uint8_t buffer[BUFFER_SIZE] = { 0 };
     uint8_t* publicKey = 0;
-    uint8_t* encryptedKey = 0;
+    uint8_t* wearableKey = 0;
     uint8_t* previousPublicKey = 0;
-    uint8_t* previousEncryptedKey = 0;
+    uint8_t* previousWearableKey = 0;
     bool hasButton = false;
 
 };

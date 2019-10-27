@@ -124,14 +124,14 @@ HSM::HSM() {
 HSM::~HSM() {
     Serial.println("Erasing all transient keys from the HSM...");
     erase(publicKey, KEY_SIZE);
-    erase(encryptedKey, KEY_SIZE);
+    erase(wearableKey, KEY_SIZE);
     erase(previousPublicKey, KEY_SIZE);
-    erase(previousEncryptedKey, KEY_SIZE);
+    erase(previousWearableKey, KEY_SIZE);
 }
 
 
 // NOTE: The returned public key must be deleted by the calling program.
-const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE]) {
+const uint8_t* HSM::generateKeys(uint8_t newMobileKey[KEY_SIZE]) {
     // validate request type
     if (validRequest(GenerateKeys)) {
         Serial.print("The HSM is in an Invalid state for this operation: ");
@@ -150,14 +150,14 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE]) {
     // generate a new key pair
     Serial.println("Generating a new key pair...");
     publicKey = new uint8_t[KEY_SIZE];
-    encryptedKey = new uint8_t[KEY_SIZE];
+    wearableKey = new uint8_t[KEY_SIZE];
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
     Ed25519::generatePrivateKey(privateKey);
     Ed25519::derivePublicKey(publicKey, privateKey);
 
     // encrypt and save the private key
     Serial.println("Hiding the new private key...");
-    XOR(newSecretKey, privateKey, encryptedKey);
+    XOR(newMobileKey, privateKey, wearableKey);
     erase(privateKey, KEY_SIZE);
 
     // return a copy of the public key
@@ -175,7 +175,7 @@ const uint8_t* HSM::generateKeys(uint8_t newSecretKey[KEY_SIZE]) {
 
 
 // NOTE: The returned public key must be deleted by the calling program.
-const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newSecretKey[KEY_SIZE]) {
+const uint8_t* HSM::rotateKeys(uint8_t existingMobileKey[KEY_SIZE], uint8_t newMobileKey[KEY_SIZE]) {
     // validate request type
     if (validRequest(RotateKeys)) {
         Serial.print("The HSM is in an Invalid state for this operation: ");
@@ -194,23 +194,23 @@ const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newS
     // handle existing keys
     Serial.println("Extracting the existing private key...");
     uint8_t* privateKey = new uint8_t[KEY_SIZE];
-    XOR(existingSecretKey, encryptedKey, privateKey);
+    XOR(existingMobileKey, wearableKey, privateKey);
 
     // validate the private key
     if (InvalidKeyPair(publicKey, privateKey)) {
-        Serial.println("An Invalid existing secret key was passed by the mobile device.");
+        Serial.println("An Invalid existing mobile key was passed by the mobile device.");
         // clean up and bail
         erase(privateKey, KEY_SIZE);
         digitalWrite(LED, LOW);
         return 0;
     }
 
-    // save copies of the previous public and encrypted keys
+    // save copies of the previous public and wearable keys
     Serial.println("Saving the previous key pair...");
     previousPublicKey = new uint8_t[KEY_SIZE];
     memcpy(previousPublicKey, publicKey, KEY_SIZE);
-    previousEncryptedKey = new uint8_t[KEY_SIZE];
-    memcpy(previousEncryptedKey, encryptedKey, KEY_SIZE);
+    previousWearableKey = new uint8_t[KEY_SIZE];
+    memcpy(previousWearableKey, wearableKey, KEY_SIZE);
 
     // generate a new key pair
     Serial.println("Generating a new key pair...");
@@ -219,7 +219,7 @@ const uint8_t* HSM::rotateKeys(uint8_t existingSecretKey[KEY_SIZE], uint8_t newS
 
     // encrypt and save the private key
     Serial.println("Hiding the new private key...");
-    XOR(newSecretKey, privateKey, encryptedKey);
+    XOR(newMobileKey, privateKey, wearableKey);
     erase(privateKey, KEY_SIZE);
 
     // return a copy of the public key
@@ -246,9 +246,9 @@ bool HSM::eraseKeys() {
 
     Serial.println("Erasing the keys...");
     erase(publicKey, KEY_SIZE);
-    erase(encryptedKey, KEY_SIZE);
+    erase(wearableKey, KEY_SIZE);
     erase(previousPublicKey, KEY_SIZE);
-    erase(previousEncryptedKey, KEY_SIZE);
+    erase(previousWearableKey, KEY_SIZE);
 
     Serial.println("Erasing the state file...");
     memset(buffer, 0x00, BUFFER_SIZE);
@@ -291,7 +291,7 @@ const uint8_t* HSM::digestBytes(const uint8_t* bytes, const size_t size) {
 
 
 // NOTE: The returned digital signature must be deleted by the calling program.
-const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes, const size_t size) {
+const uint8_t* HSM::signBytes(uint8_t mobileKey[KEY_SIZE], const uint8_t* bytes, const size_t size) {
     // validate request type
     if (validRequest(SignBytes)) {
         Serial.print("The HSM is in an Invalid state for this operation: ");
@@ -312,11 +312,11 @@ const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes,
     if (previousPublicKey) {
 
         // decrypt the private key
-        XOR(secretKey, previousEncryptedKey, privateKey);
+        XOR(mobileKey, previousWearableKey, privateKey);
 
         // validate the private key
         if (InvalidKeyPair(previousPublicKey, privateKey)) {
-            Serial.println("An Invalid previous secret key was passed by the mobile device.");
+            Serial.println("An Invalid previous mobile key was passed by the mobile device.");
             erase(privateKey, KEY_SIZE);
             digitalWrite(LED, LOW);
             return 0;
@@ -331,16 +331,16 @@ const uint8_t* HSM::signBytes(uint8_t secretKey[KEY_SIZE], const uint8_t* bytes,
 
         // erase the previous keys
         erase(previousPublicKey, KEY_SIZE);
-        erase(previousEncryptedKey, KEY_SIZE);
+        erase(previousWearableKey, KEY_SIZE);
 
     } else {
 
         // decrypt the private key
-        XOR(secretKey, encryptedKey, privateKey);
+        XOR(mobileKey, wearableKey, privateKey);
 
         // validate the private key
         if (InvalidKeyPair(publicKey, privateKey)) {
-            Serial.println("An Invalid secret key was passed by the mobile device.");
+            Serial.println("An Invalid mobile key was passed by the mobile device.");
             erase(privateKey, KEY_SIZE);
             digitalWrite(LED, LOW);
             return 0;
@@ -419,10 +419,10 @@ void HSM::loadState() {
             Serial.println("Loading the current keys...");
             publicKey = new uint8_t[KEY_SIZE];
             memcpy(publicKey, buffer + 1, KEY_SIZE);
-            encryptedKey = new uint8_t[KEY_SIZE];
-            memcpy(encryptedKey, buffer + 1 + KEY_SIZE, KEY_SIZE);
-            encoded = Codex::encode(encryptedKey, KEY_SIZE);
-            Serial.print("Encrypted Key: ");
+            wearableKey = new uint8_t[KEY_SIZE];
+            memcpy(wearableKey, buffer + 1 + KEY_SIZE, KEY_SIZE);
+            encoded = Codex::encode(wearableKey, KEY_SIZE);
+            Serial.print("Wearable Key: ");
             Serial.println(encoded);
             delete [] encoded;
         }
@@ -430,10 +430,10 @@ void HSM::loadState() {
             Serial.println("Loading the previous keys...");
             previousPublicKey = new uint8_t[KEY_SIZE];
             memcpy(previousPublicKey, buffer + 1 + 2 * KEY_SIZE, KEY_SIZE);
-            previousEncryptedKey = new uint8_t[KEY_SIZE];
-            memcpy(previousEncryptedKey, buffer + 1 + 3 * KEY_SIZE, KEY_SIZE);
-            encoded = Codex::encode(previousEncryptedKey, KEY_SIZE);
-            Serial.print("Previous Encrypted Key: ");
+            previousWearableKey = new uint8_t[KEY_SIZE];
+            memcpy(previousWearableKey, buffer + 1 + 3 * KEY_SIZE, KEY_SIZE);
+            encoded = Codex::encode(previousWearableKey, KEY_SIZE);
+            Serial.print("Previous Wearable Key: ");
             Serial.println(encoded);
             delete [] encoded;
         }
@@ -457,9 +457,9 @@ void HSM::storeState() {
         Serial.println("Saving the current keys...");
         buffer[0]++;
         memcpy(buffer + 1, publicKey, KEY_SIZE);
-        memcpy(buffer + 1 + KEY_SIZE, encryptedKey, KEY_SIZE);
-        const char* encoded = Codex::encode(encryptedKey, KEY_SIZE);
-        Serial.print("Encrypted Key: ");
+        memcpy(buffer + 1 + KEY_SIZE, wearableKey, KEY_SIZE);
+        const char* encoded = Codex::encode(wearableKey, KEY_SIZE);
+        Serial.print("Wearable Key: ");
         Serial.println(encoded);
         delete [] encoded;
     }
@@ -467,9 +467,9 @@ void HSM::storeState() {
         Serial.println("Saving the previous keys...");
         buffer[0]++;
         memcpy(buffer + 1 + 2 * KEY_SIZE, previousPublicKey, KEY_SIZE);
-        memcpy(buffer + 1 + 3 * KEY_SIZE, previousEncryptedKey, KEY_SIZE);
-        const char* encoded = Codex::encode(previousEncryptedKey, KEY_SIZE);
-        Serial.print("Previous Encrypted Key: ");
+        memcpy(buffer + 1 + 3 * KEY_SIZE, previousWearableKey, KEY_SIZE);
+        const char* encoded = Codex::encode(previousWearableKey, KEY_SIZE);
+        Serial.print("Previous Wearable Key: ");
         Serial.println(encoded);
         delete [] encoded;
     }
