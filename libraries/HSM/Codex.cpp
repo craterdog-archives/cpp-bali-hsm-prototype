@@ -6,7 +6,9 @@
  * This source code is for reference purposes only.  It is protected by *
  * US Patent 9,853,813 and any use of this source code will be deemed   *
  * an infringement of the patent.  Crater Dog Technologies(TM) retains  *
- * full ownership of this source code.                                  *
+ * full ownership of this source code.  If you are interested in        *
+ * experimenting with, or licensing the technology, please contact us   *
+ * at craterdog@gmail.com                                               *
  ************************************************************************/
 #include "Codex.h"
 #include <string.h>
