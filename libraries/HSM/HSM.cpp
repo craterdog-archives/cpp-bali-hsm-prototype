@@ -413,7 +413,6 @@ void HSM::loadState() {
         file.open(STATE_FILENAME, FILE_O_READ);
         file.read(buffer, BUFFER_SIZE);
         file.close();
-        char* encoded;
         currentState = (State) (buffer[0] + 1);
         Serial.print("The current state is: ");
         Serial.println(currentState);
@@ -423,10 +422,6 @@ void HSM::loadState() {
             memcpy(publicKey, buffer + 1, KEY_SIZE);
             wearableKey = new uint8_t[KEY_SIZE];
             memcpy(wearableKey, buffer + 1 + KEY_SIZE, KEY_SIZE);
-            encoded = Codex::encode(wearableKey, KEY_SIZE);
-            Serial.print("Wearable Key: ");
-            Serial.println(encoded);
-            delete [] encoded;
         }
         if (currentState > 2) {
             Serial.println("Loading the previous keys...");
@@ -434,10 +429,6 @@ void HSM::loadState() {
             memcpy(previousPublicKey, buffer + 1 + 2 * KEY_SIZE, KEY_SIZE);
             previousWearableKey = new uint8_t[KEY_SIZE];
             memcpy(previousWearableKey, buffer + 1 + 3 * KEY_SIZE, KEY_SIZE);
-            encoded = Codex::encode(previousWearableKey, KEY_SIZE);
-            Serial.print("Previous Wearable Key: ");
-            Serial.println(encoded);
-            delete [] encoded;
         }
     } else {
         Serial.println("Initializing the state file...");
@@ -460,20 +451,12 @@ void HSM::storeState() {
         buffer[0]++;
         memcpy(buffer + 1, publicKey, KEY_SIZE);
         memcpy(buffer + 1 + KEY_SIZE, wearableKey, KEY_SIZE);
-        const char* encoded = Codex::encode(wearableKey, KEY_SIZE);
-        Serial.print("Wearable Key: ");
-        Serial.println(encoded);
-        delete [] encoded;
     }
     if (previousPublicKey) {
         Serial.println("Saving the previous keys...");
         buffer[0]++;
         memcpy(buffer + 1 + 2 * KEY_SIZE, previousPublicKey, KEY_SIZE);
         memcpy(buffer + 1 + 3 * KEY_SIZE, previousWearableKey, KEY_SIZE);
-        const char* encoded = Codex::encode(previousWearableKey, KEY_SIZE);
-        Serial.print("Previous Wearable Key: ");
-        Serial.println(encoded);
-        delete [] encoded;
     }
     InternalFS.remove(STATE_FILENAME);
     File file(InternalFS);
