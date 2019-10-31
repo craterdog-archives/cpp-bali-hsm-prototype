@@ -11,8 +11,9 @@ please contact us at [craterdog@gmail.com](mailto:craterdog@gmail.com)._
 This project provides a working prototype of the **wearable** part of the Crater Dog Technologies™
 [Wearable Identity System™](https://craterdog.com/Identity.html).  It includes C++ code that can be
 uploaded to an [Adafruit BLE nRF52 feather board](https://www.adafruit.com/product/3406) to create
-the **prototype** hardware security module (code named "ArmorD™"). A hardened production version of
-ArmorD™ could then be embedded in a wearable device like a ring, pendant or fob.
+the **prototype** [hardware security module](https://en.wikipedia.org/wiki/Hardware_security_module)
+(code named "ArmorD™"). A hardened production version of ArmorD™ could then be embedded in a
+wearable device like a ring, pendant or fob.
 
 ### Quick Links
 For more information on this project click on the following links:
