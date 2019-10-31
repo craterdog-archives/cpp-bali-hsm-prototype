@@ -8,13 +8,11 @@ proprietary technology.  If you are interested in experimenting with, or licensi
 please contact us at [craterdog@gmail.com](mailto:craterdog@gmail.com)._
 
 ### Bali Nebula™ HSM Prototype
-This project provides a C++ **prototype** implementation of a _hardware security module_ (HSM)
-that can be uploaded to an [Adafruit BLE nRF52 Feather Board](https://www.adafruit.com/product/3406).
-The code implements the peripheral side of the security protocol defined in the
-[Bali HSM Proxy](https://github.com/craterdog-bali/js-bali-hsm-proxy/wiki) project.
-Specifically, it can be used with the
-[HSM proxy module](https://github.com/craterdog-bali/js-bali-hsm-proxy/blob/master/src/v1/HSMProxy.js)
-running on nodeJS.
+This project provides a working prototype of the **wearable** part of the Crater Dog Technologies™
+[Wearable Identity System™](https://craterdog.com/Identity.html).  It includes C++ code that can be
+uploaded to an [Adafruit BLE nRF52 feather board](https://www.adafruit.com/product/3406) to create
+the **prototype** hardware security module (code named "ArmorD™"). A hardened production version of
+ArmorD™ could then be embedded in a wearable device like a ring, pendant or fob.
 
 ### Quick Links
 For more information on this project click on the following links:
