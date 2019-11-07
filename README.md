@@ -7,7 +7,7 @@ be deemed an infringement of the patent.  Crater Dog Technologies™ retains ful
 proprietary technology.  If you are interested in experimenting with, or licensing the technology,
 please contact us at [craterdog@gmail.com](mailto:craterdog@gmail.com)._
 
-### Bali Nebula™ HSM Prototype
+### Crater Dog Technlogies™ HSM Prototype
 This project provides a working prototype of the **wearable** part of the Crater Dog Technologies™
 [Wearable Identity System™](https://craterdog.com/Identity.html).  It includes C++ code that can be
 uploaded to an [Adafruit BLE nRF52 feather board](https://www.adafruit.com/product/3406) to create
