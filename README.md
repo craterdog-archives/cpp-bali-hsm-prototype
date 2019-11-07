@@ -17,6 +17,6 @@ wearable device like a ring, pendant or fob.
 
 ### Quick Links
 For more information on this project click on the following links:
- * <a href="https://github.com/craterdog-bali/cpp-bali-hsm-prototype/wiki/docs/presos/WearableIdentitySystem-Details.pdf" target="_blank">overview presentation</a>
+ * [overview presentation](https://github.com/craterdog-bali/cpp-bali-hsm-prototype/wiki/docs/presos/WearableIdentitySystem-Details.pdf)
  * [project documentation](https://github.com/craterdog-bali/cpp-bali-hsm-prototype/wiki)
- * [patent information](https://patents.google.com/patent/US9853813)
+ * <a href="https://patents.google.com/patent/US9853813" target="_blank">patent information</a>
