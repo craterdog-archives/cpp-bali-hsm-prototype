@@ -407,38 +407,37 @@ void HSM::loadState() {
         Serial.println("Creating the state directory...");
         InternalFS.mkdir(STATE_DIRECTORY);
     }
-    if (InternalFS.exists(STATE_FILENAME)) {
-        Serial.println("Reading the state file...");
-        File file(InternalFS);
-        file.open(STATE_FILENAME, FILE_O_READ);
-        file.read(buffer, BUFFER_SIZE);
-        file.close();
-        currentState = (State) (buffer[0] + 1);
-        Serial.print("The current state is: ");
-        Serial.println(currentState);
-        if (currentState > 1) {
-            Serial.println("Loading the current keys...");
-            publicKey = new uint8_t[KEY_SIZE];
-            memcpy(publicKey, buffer + 1, KEY_SIZE);
-            wearableKey = new uint8_t[KEY_SIZE];
-            memcpy(wearableKey, buffer + 1 + KEY_SIZE, KEY_SIZE);
-        }
-        if (currentState > 2) {
-            Serial.println("Loading the previous keys...");
-            previousPublicKey = new uint8_t[KEY_SIZE];
-            memcpy(previousPublicKey, buffer + 1 + 2 * KEY_SIZE, KEY_SIZE);
-            previousWearableKey = new uint8_t[KEY_SIZE];
-            memcpy(previousWearableKey, buffer + 1 + 3 * KEY_SIZE, KEY_SIZE);
-        }
-    } else {
+    if (!InternalFS.exists(STATE_FILENAME)) {
         Serial.println("Initializing the state file...");
         memset(buffer, 0x00, BUFFER_SIZE);
-        InternalFS.remove(STATE_FILENAME);
         File file(InternalFS);
         file.open(STATE_FILENAME, FILE_O_WRITE);
         file.write(buffer, BUFFER_SIZE);
         file.flush();
         file.close();
+    } else {
+        Serial.println("Reading the state file...");
+        File file(InternalFS);
+        file.open(STATE_FILENAME, FILE_O_READ);
+        file.read(buffer, BUFFER_SIZE);
+        file.close();
+    }
+    currentState = (State) (buffer[0] + 1);
+    Serial.print("The current state is: ");
+    Serial.println(currentState);
+    if (currentState > 1) {
+        Serial.println("Loading the current keys...");
+        publicKey = new uint8_t[KEY_SIZE];
+        memcpy(publicKey, buffer + 1, KEY_SIZE);
+        wearableKey = new uint8_t[KEY_SIZE];
+        memcpy(wearableKey, buffer + 1 + KEY_SIZE, KEY_SIZE);
+    }
+    if (currentState > 2) {
+        Serial.println("Loading the previous keys...");
+        previousPublicKey = new uint8_t[KEY_SIZE];
+        memcpy(previousPublicKey, buffer + 1 + 2 * KEY_SIZE, KEY_SIZE);
+        previousWearableKey = new uint8_t[KEY_SIZE];
+        memcpy(previousWearableKey, buffer + 1 + 3 * KEY_SIZE, KEY_SIZE);
     }
 }
 
