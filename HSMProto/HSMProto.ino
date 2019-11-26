@@ -41,7 +41,7 @@ void loop(void) {
 void initConsole() {
     Serial.begin(115200);
     while (!Serial) delay(10);
-    Serial.println("The ArmorD™ v1.1 Console");
+    Serial.println("The ArmorD™ v1.2 Console");
     Serial.println("------------------------");
     Serial.println("");
 }
@@ -88,7 +88,7 @@ void initBluetooth() {
 
     // Limit the range for connections for better security
     // Allowed values: -40, -20, -16, -12, -8, -4, 0, and 4
-    Bluefruit.setTxPower(-20);
+    Bluefruit.setTxPower(-40);
 
     // The name will be displayed in the mobile app
     Bluefruit.setName("ArmorD");
@@ -141,14 +141,12 @@ void connectCallback(uint16_t connectionHandle) {
 void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
     Serial.print("Disconnected from mobile device - reason code: 0x");
     Serial.println(reason, HEX);
-    Serial.println("See: ~/Library/Arduino15/packages/adafruit/hardware/nrf52/0.11.1/cores/nRF5/nordic/softdevice/s140_nrf52_6.1.1_API/include/ble_hci.h");
+    Serial.println("See: ~/Library/Arduino15/packages/adafruit/hardware/nrf52/*/cores/nRF5/nordic/softdevice/s140_nrf52_*_API/include/ble_hci.h");
     Serial.println("");
 }
 
 
 RequestType requestType = LoadBlock;
-
-size_t requestSize = 0;
 
 
 /*
@@ -157,8 +155,8 @@ size_t requestSize = 0;
  * the arguments are referenced inline in the buffer rather than being copied into
  * their own memory.
  */
-const int BUFFER_SIZE = 10000;
-uint8_t buffer[BUFFER_SIZE];
+const int BUFFER_SIZE = 10200;  // 20 blocks * 510 bytes/block
+uint8_t buffer[BUFFER_SIZE];    // a multiple of the block size
 
 
 /*
@@ -183,7 +181,6 @@ struct Argument {
     size_t length;
 };
 Argument* arguments = 0;
-size_t numberOfArguments = 0;
 
 
 // Forward Declarations
@@ -389,13 +386,24 @@ bool readRequest() {
     if (requestType == LoadBlock) {
         // It's an extended sized request so load in one block of it
         uint8_t blockNumber = bleuart.read();
+        if ((blockNumber + 1) * BLOCK_SIZE > BUFFER_SIZE) {
+            Serial.print("The request contains too many blocks: ");
+            Serial.println(blockNumber + 1);  // zero based block numbering
+            return false;
+        }
         Serial.print("Block number: ");
         Serial.println(blockNumber);
-        requestSize += bleuart.read(buffer + blockNumber * BLOCK_SIZE, BLOCK_SIZE);
+        size_t bytesRead = bleuart.read(buffer + blockNumber * BLOCK_SIZE, BLOCK_SIZE);
+        Serial.print("Bytes read: ");
+        Serial.println(bytesRead);
     } else {
         // It's a full request so parse it
-        numberOfArguments = bleuart.read();
-        requestSize += bleuart.read(buffer, BLOCK_SIZE);
+        uint8_t numberOfArguments = bleuart.read();
+        Serial.print("Number of arguments: ");
+        Serial.println(numberOfArguments);
+        size_t bytesRead = bleuart.read(buffer, BLOCK_SIZE);
+        Serial.print("Bytes read: ");
+        Serial.println(bytesRead);
         size_t index = 0;
         if (arguments) delete [] arguments;
         arguments = new Argument[numberOfArguments];
@@ -404,26 +412,11 @@ bool readRequest() {
             arguments[i].pointer = buffer + index;
             arguments[i].length = numberOfBytes;
             index += numberOfBytes;
+            if (index > BUFFER_SIZE) {
+                Serial.print("The request was corrupted.");
+                return false;
+            }
         }
-        /*
-        if (requestSize > BUFFER_SIZE || requestSize != index) {
-            Serial.print("Invalid request type: ");
-            Serial.println(requestType);
-            Serial.print("Request length: ");
-            Serial.println(requestSize);
-            Serial.print("Expected: ");
-            Serial.println(index);
-            requestSize = 0;
-            return false;
-        }
-        */
-        requestSize = 0;
-    }
-    if (requestSize > BUFFER_SIZE) {
-        Serial.print("The request length is too long: ");
-        Serial.println(requestSize);
-        requestSize = 0;
-        return false;
     }
     return true;
 }
