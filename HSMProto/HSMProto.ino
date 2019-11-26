@@ -135,18 +135,82 @@ void connectCallback(uint16_t connectionHandle) {
 }
 
 
+char* REASON[] = {
+    "Success",
+    "Unknown BLE Command",
+    "Unknown Connection Identifier",
+    "Hardware Failure",
+    "Page Timeout",
+    "Authentication Failure",
+    "Pin or Key missing",
+    "Memory Capacity Exceeded",
+    "Connection Timeout",
+    "Connection Limit Exceeded",
+    "Synchronous Connection Limit To A Device Exceeded",
+    "ACL Connection Already Exists",
+    "Command Disallowed",
+    "Connection Rejected due to Limited Resources",
+    "Connection Rejected Due To Security Reasons",
+    "Connection Rejected due to Unacceptable BD_ADDR",
+    "Connection Accept Timeout Exceeded",
+    "Unsupported Feature or Parameter Value",
+    "Invalid BLE Command Parameters",
+    "Remote User Terminated Connection",
+    "Remote Device Terminated Connection due to low resources",
+    "Remote Device Terminated Connection due to power off",
+    "Local Host Terminated Connection",
+    "Repeated Attempts",
+    "Pairing Not Allowed",
+    "Unknown LMP PDU",
+    "Unsupported Remote Feature",
+    "SCO Offset Rejected",
+    "SCO Interval Rejected",
+    "SCO Air Mode Rejected",
+    "Invalid LMP Parameters",
+    "Unspecified Error",
+    "Unsupported LMP Parameter Value",
+    "Role Change Not Allowed",
+    "LMP Response Timeout",
+    "LMP Error Transaction Collision/LL Procedure Collision",
+    "LMP PDU Not Allowed",
+    "Encryption Mode Not Acceptable",
+    "Link Key Can Not be Changed",
+    "Requested QoS Not Supported",
+    "Instant Passed",
+    "Pairing with Unit Key Unsupported",
+    "Different Transaction Collision",
+    "Reserved",
+    "QoS Unacceptable Parameter",
+    "QoS Rejected",
+    "Channel Classification Not Supported",
+    "Insufficient Security",
+    "Parameter Out Of Mandatory Range",
+    "Reserved",
+    "Role Switch Pending",
+    "Reserved",
+    "Reserved Slot Violation",
+    "Role Switch Failed",
+    "Extended Inquiry Response Too Large",
+    "Secure Simple Pairing Not Supported By Host",
+    "Host Busy - Pairing",
+    "Connection Rejected due to No Suitable Channel Found",
+    "Controller Busy",
+    "Connection Interval Unacceptable",
+    "Directed Advertisement Timeout",
+    "Connection Terminated due to MIC Failure",
+    "Connection Failed to be Established"
+};
+
 /*
  * This callback function is invoked each time a connection to the device is lost.
+ * See: ~/Library/Arduino15/packages/adafruit/hardware/nrf52\/*\/cores/nRF5/nordic/softdevice/s140_nrf52_*_API/include/ble_hci.h");
  */
 void disconnectCallback(uint16_t connectionHandle, uint8_t reason) {
     Serial.print("Disconnected from mobile device - reason code: 0x");
     Serial.println(reason, HEX);
-    Serial.println("See: ~/Library/Arduino15/packages/adafruit/hardware/nrf52/*/cores/nRF5/nordic/softdevice/s140_nrf52_*_API/include/ble_hci.h");
+    Serial.println(REASON[reason]);
     Serial.println("");
 }
-
-
-RequestType requestType = LoadBlock;
 
 
 /*
@@ -184,7 +248,7 @@ Argument* arguments = 0;
 
 
 // Forward Declarations
-bool readRequest();
+RequestType readRequest();
 void writeResult(bool result);
 void writeResult(uint8_t* result, size_t length);
 void writeError();
@@ -195,13 +259,15 @@ void writeError();
  */
 void requestCallback(uint16_t connectionHandle) {
     // read the next request from the mobile device
-    if (!readRequest()) {
+    RequestType requestType = readRequest();
+    if (requestType == BadRequest) {
         Serial.println("Unable to read the request.");
         writeError();
         return;
     }
-    Serial.print("Request: ");
 
+    // process the request
+    Serial.print("Request: ");
     switch (requestType) {
         case LoadBlock: {
             Serial.println("Load Block");
@@ -378,18 +444,18 @@ void notifyCallback(uint16_t connectionHandle, bool enabled) {
  * [ size of argument 1 ][  argument 1 bytes  ][ size of argument 2 ][  argument 2 bytes  ]...
  * 
  */
-bool readRequest() {
+RequestType readRequest() {
     Serial.println("Attempting to read...");
 
     // Read in the request information
-    requestType = (RequestType) bleuart.read();
+    RequestType requestType = (RequestType) bleuart.read();
     if (requestType == LoadBlock) {
         // It's an extended sized request so load in one block of it
         uint8_t blockNumber = bleuart.read();
         if ((blockNumber + 1) * BLOCK_SIZE > BUFFER_SIZE) {
             Serial.print("The request contains too many blocks: ");
             Serial.println(blockNumber + 1);  // zero based block numbering
-            return false;
+            return BadRequest;
         }
         Serial.print("Block number: ");
         Serial.println(blockNumber);
@@ -414,11 +480,11 @@ bool readRequest() {
             index += numberOfBytes;
             if (index > BUFFER_SIZE) {
                 Serial.print("The request was corrupted.");
-                return false;
+                return BadRequest;
             }
         }
     }
-    return true;
+    return requestType;
 }
 
 

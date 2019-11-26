@@ -31,6 +31,7 @@ enum State {
 };
 
 enum RequestType {
+    BadRequest = -1,
     LoadBlock = 0,
     GenerateKeys = 1,
     RotateKeys = 2,

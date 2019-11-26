@@ -252,15 +252,6 @@ bool HSM::eraseKeys() {
     erase(previousPublicKey, KEY_SIZE);
     erase(previousWearableKey, KEY_SIZE);
 
-    Serial.println("Erasing the state file...");
-    memset(buffer, 0x00, BUFFER_SIZE);
-    InternalFS.remove(STATE_FILENAME);
-    File file(InternalFS);
-    file.open(STATE_FILENAME, FILE_O_WRITE);
-    file.write(buffer, BUFFER_SIZE);
-    file.flush();
-    file.close();
-
     // update current state
     transitionState(EraseKeys);
     storeState();
