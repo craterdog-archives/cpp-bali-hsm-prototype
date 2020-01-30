@@ -24,10 +24,10 @@
 // STATE MACHINE
 
 enum State {
-    Invalid = 0,
-    NoKeyPairs = 1,
-    OneKeyPair = 2,
-    TwoKeyPairs = 3
+    Invalid = -1,
+    NoKeyPairs = 0,
+    OneKeyPair = 1,
+    TwoKeyPairs = 2
 };
 
 enum RequestType {
@@ -203,10 +203,10 @@ class HSM final {
     static const size_t BUFFER_SIZE = 4 * KEY_SIZE + 1;
 
     /**
-     * This function checks to see if the specified request is allowed in the current
+     * This function checks to see if the specified request is NOT allowed in the current
      * state.
      */
-    bool validRequest(RequestType request);
+    bool invalidRequest(RequestType request);
 
     /**
      * This function transitions the HSM to the next state based on the specified
@@ -214,7 +214,7 @@ class HSM final {
      */
     void transitionState(RequestType request);
 
-    State currentState = Invalid;
+    State currentState = NoKeyPairs;
 
     /**
      * This function stores any persisted key state to the flash memory based file

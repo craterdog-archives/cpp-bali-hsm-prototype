@@ -33,9 +33,8 @@ const int MAX_WAIT_MILLISECONDS = 5 /*seconds*/ * 1000;
 
 // STATE MACHINE
 
-const State nextState[4][7] = {
+const State nextState[3][7] = {
    // LoadBlock   GenerateKeys   RotateKeys   EraseKeys  DigestBytes  SignBytes  ValidSignature
-    { Invalid,     Invalid,     Invalid,     Invalid,    Invalid,    Invalid,    Invalid },    // Invalid
     { Invalid,     OneKeyPair,  Invalid,     NoKeyPairs, NoKeyPairs, Invalid,    NoKeyPairs }, // NoKeyPairs
     { Invalid,     Invalid,     TwoKeyPairs, NoKeyPairs, OneKeyPair, OneKeyPair, OneKeyPair }, // OneKeyPair
     { Invalid,     Invalid,     Invalid,     NoKeyPairs, Invalid,    OneKeyPair, Invalid }     // TwoKeyPairs
@@ -135,8 +134,8 @@ HSM::~HSM() {
 // NOTE: The returned public key must be deleted by the calling program.
 const uint8_t* HSM::generateKeys(uint8_t newMobileKey[KEY_SIZE]) {
     // validate request type
-    if (validRequest(GenerateKeys)) {
-        Serial.print("The HSM is in an Invalid state for this operation: ");
+    if (invalidRequest(GenerateKeys)) {
+        Serial.print("The HSM is in an invalid state for this operation: ");
         Serial.println(currentState);
         return 0;
     }
@@ -179,8 +178,8 @@ const uint8_t* HSM::generateKeys(uint8_t newMobileKey[KEY_SIZE]) {
 // NOTE: The returned public key must be deleted by the calling program.
 const uint8_t* HSM::rotateKeys(uint8_t existingMobileKey[KEY_SIZE], uint8_t newMobileKey[KEY_SIZE]) {
     // validate request type
-    if (validRequest(RotateKeys)) {
-        Serial.print("The HSM is in an Invalid state for this operation: ");
+    if (invalidRequest(RotateKeys)) {
+        Serial.print("The HSM is in an invalid state for this operation: ");
         Serial.println(currentState);
         return 0;
     }
@@ -240,8 +239,8 @@ const uint8_t* HSM::rotateKeys(uint8_t existingMobileKey[KEY_SIZE], uint8_t newM
 
 bool HSM::eraseKeys() {
     // validate request type
-    if (validRequest(EraseKeys)) {
-        Serial.print("The HSM is in an Invalid state for this operation: ");
+    if (invalidRequest(EraseKeys)) {
+        Serial.print("The HSM is in an invalid state for this operation: ");
         Serial.println(currentState);
         return 0;
     }
@@ -263,8 +262,8 @@ bool HSM::eraseKeys() {
 // NOTE: The returned digest must be deleted by the calling program.
 const uint8_t* HSM::digestBytes(const uint8_t* bytes, const size_t size) {
     // validate request type
-    if (validRequest(DigestBytes)) {
-        Serial.print("The HSM is in an Invalid state for this operation: ");
+    if (invalidRequest(DigestBytes)) {
+        Serial.print("The HSM is in an invalid state for this operation: ");
         Serial.println(currentState);
         return 0;
     }
@@ -286,8 +285,8 @@ const uint8_t* HSM::digestBytes(const uint8_t* bytes, const size_t size) {
 // NOTE: The returned digital signature must be deleted by the calling program.
 const uint8_t* HSM::signBytes(uint8_t mobileKey[KEY_SIZE], const uint8_t* bytes, const size_t size) {
     // validate request type
-    if (validRequest(SignBytes)) {
-        Serial.print("The HSM is in an Invalid state for this operation: ");
+    if (invalidRequest(SignBytes)) {
+        Serial.print("The HSM is in an invalid state for this operation: ");
         Serial.println(currentState);
         return 0;
     }
@@ -367,8 +366,8 @@ bool HSM::validSignature(
     const size_t size
 ) {
     // validate request type
-    if (validRequest(ValidSignature)) {
-        Serial.print("The HSM is in an Invalid state for this operation: ");
+    if (invalidRequest(ValidSignature)) {
+        Serial.print("The HSM is in an invalid state for this operation: ");
         Serial.println(currentState);
         return 0;
     }
@@ -383,7 +382,7 @@ bool HSM::validSignature(
 }
 
 
-bool HSM::validRequest(RequestType request) {
+bool HSM::invalidRequest(RequestType request) {
     return nextState[currentState][request] == Invalid;
 }
 
@@ -413,17 +412,17 @@ void HSM::loadState() {
         file.read(buffer, BUFFER_SIZE);
         file.close();
     }
-    currentState = (State) (buffer[0] + 1);
+    currentState = (State) buffer[0];
     Serial.print("The current state is: ");
     Serial.println(currentState);
-    if (currentState > 1) {
+    if (currentState > 0) {
         Serial.println("Loading the current keys...");
         publicKey = new uint8_t[KEY_SIZE];
         memcpy(publicKey, buffer + 1, KEY_SIZE);
         wearableKey = new uint8_t[KEY_SIZE];
         memcpy(wearableKey, buffer + 1 + KEY_SIZE, KEY_SIZE);
     }
-    if (currentState > 2) {
+    if (currentState > 1) {
         Serial.println("Loading the previous keys...");
         previousPublicKey = new uint8_t[KEY_SIZE];
         memcpy(previousPublicKey, buffer + 1 + 2 * KEY_SIZE, KEY_SIZE);
