@@ -1,4 +1,4 @@
-![Logo](CraterDogLogo.png)
+<img src="https://craterdog.com/images/CraterDogLogo.png" width="50%">
 
 ### _Proprietary Technology_
 _The technology and source code in this project are for reference purposes only.  They are protected
