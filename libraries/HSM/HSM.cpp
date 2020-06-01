@@ -35,9 +35,9 @@ const int MAX_WAIT_MILLISECONDS = 5 /*seconds*/ * 1000;
 
 const State nextState[3][7] = {
    // LoadBlock   GenerateKeys   RotateKeys   EraseKeys  DigestBytes  SignBytes  ValidSignature
-    { Invalid,     OneKeyPair,  Invalid,     NoKeyPairs, NoKeyPairs, Invalid,    NoKeyPairs }, // NoKeyPairs
-    { Invalid,     Invalid,     TwoKeyPairs, NoKeyPairs, OneKeyPair, OneKeyPair, OneKeyPair }, // OneKeyPair
-    { Invalid,     Invalid,     Invalid,     NoKeyPairs, Invalid,    OneKeyPair, Invalid }     // TwoKeyPairs
+    { Invalid,     OneKeyPair,  Invalid,     NoKeyPairs, NoKeyPairs,  Invalid,    NoKeyPairs  }, // NoKeyPairs
+    { Invalid,     Invalid,     TwoKeyPairs, NoKeyPairs, OneKeyPair,  OneKeyPair, OneKeyPair  }, // OneKeyPair
+    { Invalid,     Invalid,     Invalid,     NoKeyPairs, TwoKeyPairs, OneKeyPair, TwoKeyPairs }  // TwoKeyPairs
 };
 
 

@@ -41,7 +41,7 @@ void loop(void) {
 void initConsole() {
     Serial.begin(115200);
     while (!Serial) delay(10);
-    Serial.println("The ArmorD™ v1.3 Console");
+    Serial.println("The ArmorD™ v1.4 Console");
     Serial.println("------------------------");
     Serial.println("");
 }
